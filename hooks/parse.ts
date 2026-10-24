@@ -60,8 +60,9 @@ type Run = {
 function short(value: string, cwd: string): string {
   let text = value.replace(/\s+/g, ' ').trim()
   // Codex wraps commands as `/bin/zsh -lc "…"`.
-  const wrapped = /^\/bin\/(?:ba|z)?sh -lc ["'](.*)["']$/.exec(text)
-  if (wrapped?.[1]) text = wrapped[1]
+  const wrapped = /^\/bin\/(?:ba|z)?sh -lc (?:"(.*)"|'(.*)'|(.*))$/.exec(text)
+  const inner = wrapped?.[1] ?? wrapped?.[2] ?? wrapped?.[3]
+  if (inner) text = inner
   if (cwd && text.startsWith(cwd + '/')) text = text.slice(cwd.length + 1)
 
   return text.length > 160 ? text.slice(0, 157) + '…' : text
