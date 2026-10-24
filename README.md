@@ -48,6 +48,10 @@ Then ask Claude something like: "Have agy build X. You plan and review, I'll wat
 - Claude reviews agy's claims against the actual diff: agy can report work it did not do, especially on low-effort runs. For design or multi-file work, ask Claude to pick a stronger agy model (`agy models` lists them).
 - The pane reads `~/.claude/agy-runs/live.ndjson`. The skill pipes every run there; a run started some other way does not show.
 
+## For agents
+
+[`AGENTS.md`](AGENTS.md) explains the whole system for a coding agent: the data flow of a run, agy's stream-json format, how the `/agy` pane parses and draws it, the allow-list rules, quotas and models, the review checklist and the known gotchas.
+
 ## License
 
 MIT

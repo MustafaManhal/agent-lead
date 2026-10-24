@@ -5,6 +5,8 @@ description: Lead the Antigravity CLI (agy) as your implementer. Use when the us
 
 # Leading agy
 
+Full reference (data flow, agy's stream-json format, how the `/agy` pane works, allow-list rules, quotas, review checklist): `AGENTS.md` at this plugin's root, two folders up from this file.
+
 Three roles:
 
 - **agy** (the Antigravity CLI) writes the code and runs an allow-listed set of commands. It never commits, pushes or merges.
