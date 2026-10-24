@@ -1,12 +1,12 @@
 {
-  "name": "agy-lead",
+  "name": "agent-lead",
   "owner": {
     "name": "Mustafa Manhal"
   },
-  "description": "Lead the Antigravity CLI from Claude Code, with a live pane of what it does",
+  "description": "Lead any coding agent CLI from Claude Code, with a live pane of what it does",
   "plugins": [
     {
-      "name": "agy-lead",
+      "name": "agent-lead",
       "source": "./"
     }
   ]

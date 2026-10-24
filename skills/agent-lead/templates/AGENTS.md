@@ -1,10 +1,12 @@
-# Rules for agy in this repository
+# Rules for the worker agent in this repository
 
 You are the implementer. A lead agent wrote your brief and reviews every change you make; the owner watches your work live. Do exactly what the brief asks, nothing more.
 
 ## The project
 
-<!-- Fill in: what the project is, the stack, where the docs live. Three to six lines. -->
+<!-- Fill in: what the project is, the stack, where the docs live. Three to six lines.
+     Save this file where your worker loads it: AGENTS.md (Codex, OpenCode, Cursor, agy), .agents/rules/AGENTS.md (agy),
+     CLAUDE.md (Claude Code), GEMINI.md (Gemini CLI), QWEN.md (Qwen Code). Keep one copy and link the others to it. -->
 
 ## Code style
 
@@ -17,7 +19,7 @@ You are the implementer. A lead agent wrote your brief and reviews every change 
 
 ## Commands
 
-You may run only: `ls`, `pwd`, `cat`, `head`, `tail`, `wc`, `find`, `grep`, `rg`, `tree`, `diff`, `file`, `git status`, `git diff`, `git log`, `git show`, `git branch`, `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`. Anything else is refused, and one refused command ends your whole run.
+You may run only these (the same list the user allowed in your CLI's settings): `ls`, `pwd`, `cat`, `head`, `tail`, `wc`, `find`, `grep`, `rg`, `tree`, `diff`, `file`, `git status`, `git diff`, `git log`, `git show`, `git branch`, `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`. Anything else is refused, and one refused command ends your whole run.
 
 - Never put square brackets in a command: `git diff app/[id]/page.tsx` is refused. Run `git diff` with no path instead.
 - Read, list, search and edit files with your file tools, never the shell. `sed`, `awk`, `echo >`, `python` and `node -e` are refused and end your run.

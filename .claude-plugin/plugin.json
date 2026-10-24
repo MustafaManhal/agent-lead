@@ -1,9 +1,21 @@
 {
-  "name": "agy-lead",
-  "version": "0.1.0",
-  "description": "Lead the Antigravity CLI (agy) from Claude Code: agy writes the code, Claude plans and reviews, and you watch it live in a pane",
-  "author": { "name": "Mustafa Manhal" },
+  "name": "agent-lead",
+  "version": "0.2.0",
+  "description": "Lead any coding agent CLI (agy, Codex, Gemini, Qwen, OpenCode, Cursor, Claude Code, Aider, \u2026) from Claude Code: it codes, Claude plans and reviews, you watch it live in a pane",
+  "author": {
+    "name": "Mustafa Manhal"
+  },
   "license": "MIT",
-  "keywords": ["agy", "antigravity", "delegation", "code-review", "pane"],
+  "keywords": [
+    "agents",
+    "delegation",
+    "code-review",
+    "codex",
+    "gemini",
+    "opencode",
+    "cursor",
+    "agy",
+    "pane"
+  ],
   "types": "./types/index.d.ts"
 }
