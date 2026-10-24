@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "command(ls)",
+      "command(pwd)",
+      "command(cat)",
+      "command(head)",
+      "command(tail)",
+      "command(wc)",
+      "command(find)",
+      "command(grep)",
+      "command(rg)",
+      "command(tree)",
+      "command(diff)",
+      "command(file)",
+      "command(git status)",
+      "command(git diff)",
+      "command(git log)",
+      "command(git show)",
+      "command(git branch)",
+      "command(npm test)",
+      "command(npm run lint)",
+      "command(npm run typecheck)",
+      "command(npm run build)"
+    ]
+  }
+}

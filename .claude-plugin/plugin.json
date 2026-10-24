@@ -1,0 +1,9 @@
+{
+  "name": "agy-lead",
+  "version": "0.1.0",
+  "description": "Lead the Antigravity CLI (agy) from Claude Code: agy writes the code, Claude plans and reviews, and you watch it live in a pane",
+  "author": { "name": "Mustafa Manhal" },
+  "license": "MIT",
+  "keywords": ["agy", "antigravity", "delegation", "code-review", "pane"],
+  "types": "./types/index.d.ts"
+}
