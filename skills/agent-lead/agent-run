@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# Runs a coding agent CLI as a worker, safely, and shows it live in the /agent pane.
+#
+#   agent-run <cli> <brief-file> [--cd <dir>] [--resume <session-id>] [--model <model>]
+#
+# <cli>: agy, claude, codex, gemini, qwen, opencode, cursor. For any other CLI use run-agent.sh.
+# The built-in worker rules are put in front of the brief, and each CLI gets per-run safety
+# flags (an allow list or a sandbox), so no project or worker config file has to be edited.
+# Prints the last lines of the run and a final "SESSION <cli> <id>" line for follow-ups
+# (pass that id back with --resume). Exits with the worker's exit code.
+set -uo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+usage() { echo "usage: agent-run <agy|claude|codex|gemini|qwen|opencode|cursor> <brief-file> [--cd <dir>] [--resume <id>] [--model <model>]" >&2; exit 2; }
+[ "$#" -ge 2 ] || usage
+
+cli="$1"
+brief="$2"
+shift 2
+dir=""
+resume=""
+model=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --cd) dir="$2"; shift 2 ;;
+    --resume) resume="$2"; shift 2 ;;
+    --model) model="$2"; shift 2 ;;
+    *) usage ;;
+  esac
+done
+[ -f "$brief" ] || { echo "agent-run: brief file not found: $brief" >&2; exit 2; }
+brief="$(cd "$(dirname "$brief")" && pwd)/$(basename "$brief")"
+if [ -n "$dir" ]; then cd "$dir" || exit 2; fi
+
+# A follow-up keeps the session's context, so it sends only the fixes; a new run gets the rules too.
+if [ -n "$resume" ]; then
+  prompt="$(cat "$brief")"
+else
+  prompt="$(cat "$here/worker-rules.md")"$'\n\n'"$(cat "$brief")"
+fi
+
+# The safe command set (extend with AGENT_LEAD_ALLOW="cmd one,cmd two").
+safe=(ls pwd cat head tail wc find grep rg tree diff file "git status" "git diff" "git log" "git show" "git branch" "npm test" "npm run lint" "npm run typecheck" "npm run build")
+if [ -n "${AGENT_LEAD_ALLOW:-}" ]; then IFS=',' read -r -a extra <<< "$AGENT_LEAD_ALLOW"; safe+=("${extra[@]}"); fi
+
+cmd=()
+cleanup=""
+# Remove a per-run file even if the run is interrupted.
+trap '[ -n "$cleanup" ] && rm -f "$cleanup"' EXIT
+case "$cli" in
+  agy)
+    cmd=(agy -p "$prompt" --mode accept-edits --output-format stream-json --print-timeout 1500s)
+    agy remote-control status 2>/dev/null | grep -q "state = active" && cmd+=(--remote-control)
+    [ -n "$resume" ] && cmd+=(--conversation "$resume")
+    [ -n "$model" ] && cmd+=(--model "$model")
+    ;;
+  claude)
+    tools=(Read Grep Glob Edit Write)
+    for c in "${safe[@]}"; do tools+=("Bash($c:*)"); done
+    cmd=(claude -p "$prompt" --output-format stream-json --verbose --permission-mode acceptEdits --allowedTools "${tools[@]}")
+    [ -n "$resume" ] && cmd+=(--resume "$resume")
+    [ -n "$model" ] && cmd+=(--model "$model")
+    ;;
+  codex)
+    if [ -n "$resume" ]; then
+      cmd=(codex exec resume "$resume" --json -c 'sandbox_mode="workspace-write"')
+    else
+      cmd=(codex exec --json --sandbox workspace-write --skip-git-repo-check)
+    fi
+    [ -n "$model" ] && cmd+=(-m "$model")
+    cmd+=("$prompt")
+    ;;
+  gemini|qwen)
+    allowed=""
+    for c in "${safe[@]}"; do allowed+="run_shell_command($c),"; done
+    cmd=("$cli" -p "$prompt" --output-format stream-json --approval-mode auto_edit --allowed-tools "${allowed%,}")
+    [ -n "$resume" ] && cmd+=(--resume "$resume")
+    [ -n "$model" ] && cmd+=(-m "$model")
+    ;;
+  opencode)
+    [ -n "$model" ] || [ -n "$resume" ] || { echo "agent-run: opencode needs --model provider/model" >&2; exit 2; }
+    # OpenCode reads permissions from opencode.json in the run folder; add one for this run only.
+    if [ ! -e opencode.json ]; then
+      rules=""
+      for c in "${safe[@]}"; do rules+="\"$c*\":\"allow\","; done
+      printf '{"$schema":"https://opencode.ai/config.json","permission":{"edit":"allow","bash":{"*":"deny",%s}}}\n' "${rules%,}" > opencode.json
+      cleanup="opencode.json"
+    else
+      echo "agent-run: this folder has its own opencode.json; its permissions apply" >&2
+    fi
+    cmd=(opencode run --format json)
+    [ -n "$model" ] && cmd+=(--model "$model")
+    [ -n "$resume" ] && cmd+=(--session "$resume")
+    cmd+=("$prompt")
+    ;;
+  cursor)
+    # Cursor reads its allow list from ~/.cursor/cli-config.json (setup.sh adds the safe set once).
+    cmd=(cursor-agent -p --trust --output-format stream-json)
+    [ -n "$resume" ] && cmd+=(--resume "$resume")
+    [ -n "$model" ] && cmd+=(--model "$model")
+    cmd+=("$prompt")
+    ;;
+  *)
+    echo "agent-run: unknown CLI '$cli'. For any other CLI use: run-agent.sh <name> <command...>" >&2
+    exit 2
+    ;;
+esac
+
+AGENT_LEAD_TAIL="${AGENT_LEAD_TAIL:-20}" "$here/run-agent.sh" "$cli" "${cmd[@]}"
+code=$?
+
+log="${AGENT_LEAD_LOG:-$HOME/.claude/agent-runs/live.log}"
+session="$(grep -o -E '"(conversation_id|session_id|thread_id|sessionID)":"[^"]+"' "$log" | head -1 | sed -E 's/.*:"([^"]+)"/\1/')"
+echo "SESSION $cli ${session:-unknown}"
+exit "$code"

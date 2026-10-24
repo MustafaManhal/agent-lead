@@ -13,15 +13,21 @@ Three roles:
 - **You, the lead**: plan the work, write the brief, review every change yourself, send fixes back, land the result.
 - **The user**: watches every step in the `/agent` pane and has the last word on design decisions and on anything that ships.
 
-## One-time setup (check each, fix what is missing)
+## Setup: once per machine, never per project or session
 
-1. **The worker CLI is installed and signed in**: run its `--version`. If not, tell the user; do not install or sign in for them.
-2. **The run wrapper**: copy `run-agent.sh` from this skill's folder to `~/.claude/agent-runs/run-agent.sh` and make it executable. It gives every run the same start and end lines, so the pane shows any CLI's name, status and exit code.
-3. **You may launch the worker**: an allow rule for the wrapper in the project's `.claude/settings.local.json`, for example `"Bash(/Users/<you>/.claude/agent-runs/run-agent.sh:*)"`. Auto mode may block launching another agent until it exists; if a call is refused, explain and let the user decide.
-4. **What the worker may run without asking**: headless workers cannot ask for permission. Set up the worker's own allow list from `templates/allow-lists.md` (one section per CLI). Only the user edits those files; show them what to add.
-5. **The worker's rules file**: copy `templates/AGENTS.md` into the project where the worker loads it (see the table below), fill in the project section, and commit it. It is what keeps briefs short.
+Check: `test -x ~/.claude/agent-runs/agent-run && echo ready`. If it is not ready, ask the user to run this once themselves (it edits their settings, so it must be them, not you), then restart Claude Code or run `/reload-plugins`:
+
+```
+! bash <this skill's folder>/setup.sh
+```
+
+It installs `agent-run`, `run-agent.sh` and the worker rules into `~/.claude/agent-runs/`, lets Claude Code run them in every project (user-level allow rules), and adds a safe allow list to the worker CLIs that keep theirs in a file (agy, Cursor Agent). Nothing else needs editing: `agent-run` puts the worker rules in front of every brief and gives each CLI per-run limits (Claude Code and Gemini/Qwen: an allowed-tools list; Codex: the `workspace-write` sandbox; OpenCode: a temporary `opencode.json` removed after the run). A project rules file (`AGENTS.md`, `CLAUDE.md`, …) is optional; the worker follows it when present.
+
+The worker CLI must be installed and signed in; if it is not, tell the user. Do not install or sign in for them.
 
 ## The workers
+
+Use `agent-run` for these; the table shows what it runs underneath, for debugging or for running a CLI by hand.
 
 | CLI | Headless run with live events | Follow-up in the same session | Rules file it loads |
 | --- | --- | --- | --- |
@@ -44,14 +50,14 @@ Pick the model with the CLI's model flag when the task is design work or spans m
    git worktree add ../<repo>-worker -b worker/<task> <working-branch>
    ```
    Install dependencies there yourself (workers should not install), and generate anything the type checker needs (for Next.js: `npx next typegen`). Never copy secrets (`.env.local`) into it.
-2. **Brief.** Write it to a file in your scratchpad: the goal, the exact files (and lines where you know them), the expected result, the commands the task needs, and which project docs to read if it needs more context. Be concrete about visuals: tokens, sizes, states, both themes, phone width. The rules file covers the rest.
-3. **Run through the wrapper**, always `cd`-ing in the same command (your shell may return to the repo root after each call):
+2. **Brief.** Write it to a file in your scratchpad: the goal, the exact files (and lines where you know them), the expected result, the commands the task needs, and which project docs to read if it needs more context. Be concrete about visuals: tokens, sizes, states, both themes, phone width. The built-in worker rules (`worker-rules.md`, added by `agent-run`) cover the rest.
+3. **Run** with the launcher, one command, no `cd` chain:
    ```bash
-   cd ../<repo>-worker && ~/.claude/agent-runs/run-agent.sh <cli-name> <headless command from the table>
+   ~/.claude/agent-runs/agent-run <cli> <brief-file> --cd ../<repo>-worker [--model <model>]
    ```
-   The wrapper prints the last lines of the run; the session id for follow-ups is in the CLI's first or last event (`conversation_id`, `session_id`, `thread_id`, `sessionID`).
+   `<cli>` is `agy`, `claude`, `codex`, `gemini`, `qwen`, `opencode` (needs `--model provider/model`) or `cursor`. It prints the last lines of the run and `SESSION <cli> <id>`. For any other CLI: `~/.claude/agent-runs/run-agent.sh <name> <its headless command>` inside the worktree. Extra allowed commands for one run: `AGENT_LEAD_ALLOW="npm run e2e,make check" agent-run …`.
 4. **Review, never on the worker's word.** Read `git diff` in the worktree. Check every claim in its report against the files. Run typecheck, lint and build; for UI, screenshots at phone and desktop width in both themes, keyboard focus and an accessibility check; add edge cases it did not test.
-5. **Send fixes** to the same session with the CLI's follow-up flag and an exact review (what is wrong, where, what it should be). Fix a one- or two-line nit yourself instead; say so in the commit.
+5. **Send fixes** to the same session: `agent-run <cli> <fixes-file> --cd <worktree> --resume <id>`, with an exact review (what is wrong, where, what it should be). Fix a one- or two-line nit yourself instead; say so in the commit.
 6. **Land.** Commit on the worker branch under the user's identity and conventions, merge into the working branch, remove the worktree and branch. Ship to production only with the user's approval.
 
 ## Gotchas

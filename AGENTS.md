@@ -10,21 +10,26 @@ You are probably the lead agent: the coding agent in the user's main session. Th
 | You, the lead | the user's coding session | Plan, brief, review, send fixes, land. |
 | The user | watching | Approves design decisions and anything that ships. |
 | Skill `agent-lead` | `skills/agent-lead/SKILL.md` | The procedure, and the per-CLI command table. |
+| Launcher | `skills/agent-lead/agent-run`, installed to `~/.claude/agent-runs/agent-run` | For the known CLIs: builds the headless command with its stream flag, puts `worker-rules.md` in front of the brief, applies per-run limits, calls the wrapper, prints `SESSION <cli> <id>`. |
 | Run wrapper | `skills/agent-lead/run-agent.sh`, installed to `~/.claude/agent-runs/run-agent.sh` | Runs any CLI, frames its output with start/end lines, writes the live log. |
+| Setup | `skills/agent-lead/setup.sh`, run once per machine by the user | Installs the scripts, adds user-level Claude Code allow rules for them, adds the safe set to agy's and Cursor's allow-list files. Idempotent, backs up what it changes. |
 | Pane `/agent` (alias `/agy`) | `hooks/register.tsx` + `hooks/parse.ts` | Live view of the run beside the chat. |
-| Rules file | in the project, where the worker loads it (template `skills/agent-lead/templates/AGENTS.md`) | Project, style, allowed commands, report format. |
-| Allow list | the worker's own settings (examples in `skills/agent-lead/templates/allow-lists.md`) | What a headless worker may run. Only the user edits it. |
+| Worker rules | `skills/agent-lead/worker-rules.md`, prepended to every new brief by `agent-run` | Role, allowed commands, no shell file reading, no commits, report format. A project rules file (template `templates/AGENTS.md`) is optional extra context. |
+| Per-run limits | built into `agent-run` | Claude Code `--allowedTools`, Gemini/Qwen `--allowed-tools`, Codex `--sandbox workspace-write`, OpenCode a temporary `opencode.json` (deleted on exit), agy and Cursor their allow-list files from setup. |
 
 ## Data flow of one run
 
 ```
-lead writes brief
-  └─> cd <worktree> && run-agent.sh <cli-name> <cli headless command with its JSON stream flag>
-        ├─ writes {"lead":"start","agent","cwd","at"}            ┐
-        ├─ every line the CLI prints (stdout + stderr)           ├─> ~/.claude/agent-runs/live.log ──> /agent pane (reads it every 1 s)
-        └─ writes {"lead":"end","code","at"}, exits with the code┘
-  └─> prints the last 25 lines to the lead
-lead reviews the worktree diff ──> fixes: same CLI with its resume flag and the session id ──> lead commits, merges, removes the worktree
+lead writes brief.md
+  └─> agent-run <cli> brief.md --cd <worktree> [--model m] [--resume id]
+        ├─ prompt = worker-rules.md + brief (a --resume run sends only the brief)
+        ├─ builds the CLI's headless command with its JSON stream flag and per-run limits
+        └─> run-agent.sh <cli> <command…>
+              ├─ writes {"lead":"start","agent","cwd","at"}             ┐
+              ├─ every line the CLI prints (stdout + stderr)            ├─> ~/.claude/agent-runs/live.log ──> /agent pane (reads it every 1 s)
+              └─ writes {"lead":"end","code","at"}, exits with the code ┘
+        └─> prints the last lines and "SESSION <cli> <id>" to the lead
+lead reviews the worktree diff ──> fixes: agent-run <cli> fixes.md --cd <worktree> --resume <id> ──> lead commits, merges, removes the worktree
 ```
 
 The log is overwritten by each run, so the pane shows one run at a time. `AGENT_LEAD_LOG` changes the path (the pane only reads the default path and the old `~/.claude/agy-runs/live.ndjson`). `AGENT_LEAD_TAIL` changes how many lines the wrapper prints back.
@@ -58,6 +63,9 @@ Denials: any error text matching `denied|not allowed|permission|rejected|decline
 **Changing it**: edit `hooks/parse.ts` or `hooks/register.tsx`; when `AgentView` changes, update `types/index.d.ts` and bump the atom's `shape` tag so old stored values are dropped; run `claude plugin validate .`.
 
 ## Allow lists (learned the hard way)
+
+- Setup is once per machine (`setup.sh`, run by the user); nothing per project or session. Claude Code's auto mode refuses to edit settings or agent allow lists itself, which is why the user runs it.
+- Verified: OpenCode ignores permissions passed through `OPENCODE_CONFIG` or `OPENCODE_CONFIG_CONTENT` but honours an `opencode.json` in the run folder, so `agent-run` writes one there for the run and deletes it on exit (it leaves an existing one alone).
 
 - Headless workers cannot ask. Anything not allowed is refused, and on some CLIs (agy) one refusal ends the run.
 - Prefer allow lists to "approve everything" switches (`--force`, `yolo`, `--dangerously-skip-permissions`, `danger-full-access`). Never use those for a worker.

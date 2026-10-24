@@ -1,6 +1,6 @@
 {
   "name": "agent-lead",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Lead any coding agent CLI (agy, Codex, Gemini, Qwen, OpenCode, Cursor, Claude Code, Aider, \u2026) from Claude Code: it codes, Claude plans and reviews, you watch it live in a pane",
   "author": {
     "name": "Mustafa Manhal"
