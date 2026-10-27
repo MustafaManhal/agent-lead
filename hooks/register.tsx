@@ -7,6 +7,7 @@ import { EMPTY, STALE_MS, parseRun } from './parse'
 const LOGS = ['.claude/agent-runs/live.log', '.claude/agy-runs/live.ndjson']
 const PANE = 'agent-lead'
 const TITLE = 'agent live'
+const OPEN = { id: PANE, title: TITLE, closeOnEscape: true } as const
 
 const view = atom({ plugin: 'agent-lead', key: 'view' } as const, EMPTY, {
   shape: 'view-2',
@@ -20,7 +21,7 @@ export const register: Register = on => {
     const started = await next(e)
     await $.command.register({
       name: 'agent',
-      description: 'Show what your coding agent CLI is doing, live',
+      description: 'Show what your coding agent CLI is doing, live (/agent close hides it)',
     })
     await $.command.register({
       name: 'agy',
@@ -54,7 +55,7 @@ export const register: Register = on => {
         await update($, view, () => parsed)
         // Open the pane when a run starts, follow-up rounds of one conversation included.
         if (parsed.status === 'running' && current.status !== 'running') {
-          void $.ui.open({ id: PANE, title: TITLE })
+          void $.ui.open(OPEN)
         }
       } catch {
         // The file is mid-write or gone; the next tick tries again.
@@ -67,10 +68,15 @@ export const register: Register = on => {
   })
 
   for (const command of ['agent', 'agy']) {
-    on('command.run', { command }, async $ => {
-      await $.ui.open({ id: PANE, title: TITLE })
+    on('command.run', { command }, async ($, e) => {
+      // An inline pane has no close mark of its own, so the command closes it too.
+      if (/^(close|hide|off)$/i.test(e.args.trim())) {
+        await $.ui.close({ id: PANE })
+        return { text: 'Agent live pane closed.' }
+      }
+      await $.ui.open(OPEN)
 
-      return { text: 'Agent live pane opened.' }
+      return { text: 'Agent live pane opened. /agent close hides it.' }
     })
   }
 
@@ -78,12 +84,20 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const state = await read($, view)
     const rows = Math.max(6, (e.viewport?.rows ?? 30) - 4)
+    // An inline pane has no close mark of the engine's, so the last row names the way out.
+    const closeNote = (
+      <Box flexDirection="row" justifyContent="center">
+        <Text dimColor>If you want to close the pane, use /agent close</Text>
+      </Box>
+    )
 
     if (state.status === 'idle') {
       return (
         <Box flexDirection="column">
           <Text dimColor>No agent run yet.</Text>
           <Text dimColor>Runs piped to ~/{LOGS[0]} show here.</Text>
+          <Text> </Text>
+          {closeNote}
         </Box>
       )
     }
@@ -103,7 +117,7 @@ export const register: Register = on => {
     const logOnly = state.steps.length === 0 && state.log.length > 0
     const stepRoom = Math.max(3, Math.floor(rows * 0.55))
     const used = Math.min(stepRoom, logOnly ? state.log.length : state.steps.length)
-    const replyRoom = Math.max(2, rows - used - 4)
+    const replyRoom = Math.max(2, rows - used - 6)
 
     return (
       <Box flexDirection="column">
@@ -147,6 +161,8 @@ export const register: Register = on => {
             {line}
           </Text>
         ))}
+        <Text> </Text>
+        {closeNote}
       </Box>
     )
   })

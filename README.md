@@ -61,7 +61,7 @@ Every later session: run `/lead` again. The lead reads `LEAD.md` and continues w
 | `agent-lead` skill | `SKILL.md` (the procedure) plus `project-setup.md`, `foundation.md`, `research.md`, `playwright.md`, `review.md`, `workflows/handoff.md`, `workflows/pane.md` and `clis.md`. |
 | Templates | The six docs, `LEAD.md`, `WORKER.md`, `brief.md`, `review-round.md`, `status.md`, `decisions.md`, an `AGENTS.md` pointer section, allow lists. |
 | `plan-page.mjs` | Turns the implementation plan into a one-page progress view (light and dark, phone-friendly). |
-| `/agent` pane | Live view of a Pane-mode run: each file read or written, each command with its exit code, refused commands in red, the reply, time and tokens. Opens by itself. `/agy` still works. |
+| `/agent` pane | Live view of a Pane-mode run: each file read or written, each command with its exit code, refused commands in red, the reply, time and tokens. Opens by itself; `/agent close` hides it. `/agy` still works. |
 | `agent-run`, `run-agent.sh` | Launch a worker CLI headless with per-run limits and record it for the pane. |
 | `setup.sh` | One-time setup for Pane mode. |
 
