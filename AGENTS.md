@@ -1,6 +1,13 @@
 # Notes for agents: how agent-lead works
 
-You are probably the lead agent: the coding agent in the user's main session. This file explains the whole system so you can run it, fix it, or extend it to a new CLI without guessing. The operating procedure is the skill (`skills/agent-lead/SKILL.md`); this is the reference behind it.
+You are probably the lead agent: the coding agent in the user's main session. This file explains the whole system so you can run it, fix it, or extend it to a new CLI without guessing. The operating procedure is the skill (`skills/agent-lead/SKILL.md`, started by the `/lead` command); this is the reference behind it.
+
+## Two workflows
+
+- **Handoff**: the user runs the worker in their own tool and pastes the one-line prompts the lead gives them. Briefs, reports and review rounds are files in the project's `.agent-lead/briefs/`; the user says "report ready" when the worker is done. No scripts, no pane. (`skills/agent-lead/workflows/handoff.md`)
+- **Pane**: the lead launches the worker headless with `agent-run` and the `/agent` pane shows the run live. Everything below about the launcher, the wrapper, the event formats and the pane applies to this mode. (`skills/agent-lead/workflows/pane.md`)
+
+Both share the same project files (`.agent-lead/LEAD.md`, `WORKER.md`, `status.md`, `briefs/`), the six product docs (PRD, TRD, UI/UX design, app flow, backend schema, implementation plan; the last is the checklist), the review checklist (`review.md`) and the ship steps (SKILL.md section 3).
 
 ## The parts
 
@@ -9,12 +16,15 @@ You are probably the lead agent: the coding agent in the user's main session. Th
 | The worker | any coding agent CLI (agy, Claude Code, Codex, Gemini CLI, Qwen Code, OpenCode, Cursor Agent, Aider, …) | Implementer. Writes code, runs allow-listed commands. Never commits. |
 | You, the lead | the user's coding session | Plan, brief, review, send fixes, land. |
 | The user | watching | Approves design decisions and anything that ships. |
-| Skill `agent-lead` | `skills/agent-lead/SKILL.md` | The procedure, and the per-CLI command table. |
+| Command `/lead` | `commands/lead.md` | Starts or resumes the lead workflow: reads `.agent-lead/LEAD.md` or runs the project setup. |
+| Skill `agent-lead` | `skills/agent-lead/SKILL.md` + `project-setup.md`, `foundation.md`, `research.md`, `playwright.md`, `review.md`, `workflows/`, `clis.md` | The procedure: setup, the six docs, the item loop, review, shipping, both workflows. |
+| Templates | `skills/agent-lead/templates/` | The six docs (`docs/`), `LEAD.md`, `WORKER.md`, `brief.md`, `review-round.md`, `status.md`, `decisions.md`, `AGENTS.md` pointer section, `allow-lists.md`. |
+| Checklist page | `skills/agent-lead/plan-page.mjs` | Markdown checklist to a one-page HTML progress view. |
 | Launcher | `skills/agent-lead/agent-run`, installed to `~/.claude/agent-runs/agent-run` | For the known CLIs: builds the headless command with its stream flag, puts `worker-rules.md` in front of the brief, applies per-run limits, calls the wrapper, prints `SESSION <cli> <id>`. |
 | Run wrapper | `skills/agent-lead/run-agent.sh`, installed to `~/.claude/agent-runs/run-agent.sh` | Runs any CLI, frames its output with start/end lines, writes the live log. |
 | Setup | `skills/agent-lead/setup.sh`, run once per machine by the user | Installs the scripts, adds user-level Claude Code allow rules for them, adds the safe set to agy's and Cursor's allow-list files. Idempotent, backs up what it changes. |
 | Pane `/agent` (alias `/agy`) | `hooks/register.tsx` + `hooks/parse.ts` | Live view of the run beside the chat. |
-| Worker rules | `skills/agent-lead/worker-rules.md`, prepended to every new brief by `agent-run` | Role, allowed commands, no shell file reading, no commits, report format. A project rules file (template `templates/AGENTS.md`) is optional extra context. |
+| Worker rules | Pane: `skills/agent-lead/worker-rules.md`, prepended to every new brief by `agent-run` (role, allowed commands, no shell file reading, no commits, report). Both modes: the project's `.agent-lead/WORKER.md` (template `templates/WORKER.md`), which the brief tells the worker to read. | |
 | Per-run limits | built into `agent-run` | Claude Code `--allowedTools`, Gemini/Qwen `--allowed-tools`, Codex `--sandbox workspace-write`, OpenCode a temporary `opencode.json` (deleted on exit), agy and Cursor their allow-list files from setup. |
 
 ## Data flow of one run

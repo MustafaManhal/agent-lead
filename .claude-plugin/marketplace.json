@@ -3,7 +3,7 @@
   "owner": {
     "name": "Mustafa Manhal"
   },
-  "description": "Lead any coding agent CLI from Claude Code, with a live pane of what it does",
+  "description": "Make Claude Code the lead of any project and another coding agent the worker, with a Handoff or a live Pane workflow",
   "plugins": [
     {
       "name": "agent-lead",

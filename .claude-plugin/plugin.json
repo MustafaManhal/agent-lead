@@ -1,21 +1,26 @@
 {
   "name": "agent-lead",
-  "version": "0.3.0",
-  "description": "Lead any coding agent CLI (agy, Codex, Gemini, Qwen, OpenCode, Cursor, Claude Code, Aider, \u2026) from Claude Code: it codes, Claude plans and reviews, you watch it live in a pane",
+  "version": "0.4.0",
+  "description": "Make Claude Code the lead of any project and another coding agent (agy, Codex, Gemini, Qwen, OpenCode, Cursor, Claude Code, Aider, …) the worker: /lead sets up the six product docs and the checklist, writes briefs, reviews and commits; Handoff (you paste prompts) or Pane (watch it live) workflows",
   "author": {
     "name": "Mustafa Manhal"
   },
   "license": "MIT",
   "keywords": [
     "agents",
-    "delegation",
+    "agy",
     "code-review",
     "codex",
-    "gemini",
-    "opencode",
     "cursor",
-    "agy",
-    "pane"
+    "delegation",
+    "gemini",
+    "handoff",
+    "lead",
+    "opencode",
+    "pane",
+    "planning",
+    "prd",
+    "workflow"
   ],
   "types": "./types/index.d.ts"
 }
