@@ -16,5 +16,6 @@ lead of this project. Arguments from the user: `$ARGUMENTS`
      Then make sure the six docs exist (PRD, TRD, UI/UX design, app flow, backend schema, implementation plan) by
      following `foundation.md` for whatever is missing.
 2. Any other words in the arguments are the user's goal or note for this session: take them into account.
-3. End by telling the user, in a few short lines, where things stand and what happens next. In Handoff mode, end
+3. End by telling the user, in a few short lines, where things stand and what happens next, with the checklist page
+   link (`checklist-page.md`; ask about the page once if LEAD.md has no "Checklist page" row). In Handoff mode, end
    with the worker prompt for the next item in its own code block.

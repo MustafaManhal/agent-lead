@@ -51,7 +51,8 @@ Every later session: run `/lead` again. The lead reads `LEAD.md` and continues w
 5. The lead reviews: the report against the brief, the diff against the report, the checks, the risky code, the
    screenshots, and one real check of its own. Then either a review round (`<brief>-2.md`) or a commit.
 6. On commit: the checklist item is marked, the worker's branch is merged, the worker's checkout is synced,
-   `status.md` and `LEAD.md` are updated, the checklist page is rebuilt, and you get the totals and the next prompt.
+   `status.md` and `LEAD.md` are updated, the checklist page is rebuilt and republished, and you get the totals, the
+   page link and the next prompt.
 
 ## What's inside
 
@@ -60,7 +61,7 @@ Every later session: run `/lead` again. The lead reads `LEAD.md` and continues w
 | `/lead` command | Starts or resumes the lead workflow in the current project. |
 | `agent-lead` skill | `SKILL.md` (the procedure) plus `project-setup.md`, `foundation.md`, `research.md`, `playwright.md`, `review.md`, `workflows/handoff.md`, `workflows/pane.md` and `clis.md`. |
 | Templates | The six docs, `LEAD.md`, `WORKER.md`, `brief.md`, `review-round.md`, `status.md`, `decisions.md`, an `AGENTS.md` pointer section, allow lists. |
-| `plan-page.mjs` | Turns the implementation plan into a one-page progress view (light and dark, phone-friendly). |
+| Checklist page | Every project gets one (you are asked once): the plan as a page with overall progress, the next item, milestone cards that fold away when done, Details for long notes, Expand all / Collapse all / Hide done, light and dark, phone-friendly. Published privately with the Artifact tool to one link that stays the same, or kept as a local file. Rebuilt after every checklist change. Built by `plan-page.mjs`. |
 | `/agent` pane | Live view of a Pane-mode run: each file read or written, each command with its exit code, refused commands in red, the reply, time and tokens. Opens by itself; `/agent close` hides it. `/agy` still works. |
 | `agent-run`, `run-agent.sh` | Launch a worker CLI headless with per-run limits and record it for the pane. |
 | `setup.sh` | One-time setup for Pane mode. |

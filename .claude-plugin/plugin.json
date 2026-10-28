@@ -1,6 +1,6 @@
 {
   "name": "agent-lead",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Make Claude Code the lead of any project and another coding agent (agy, Codex, Gemini, Qwen, OpenCode, Cursor, Claude Code, Aider, …) the worker: /lead sets up the six product docs and the checklist, writes briefs, reviews and commits; Handoff (you paste prompts) or Pane (watch it live) workflows",
   "author": {
     "name": "Mustafa Manhal"
@@ -9,6 +9,7 @@
   "keywords": [
     "agents",
     "agy",
+    "checklist",
     "code-review",
     "codex",
     "cursor",

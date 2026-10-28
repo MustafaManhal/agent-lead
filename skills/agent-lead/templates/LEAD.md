@@ -21,13 +21,13 @@ facts. Keep section 8 current.
 | The six docs | <docs folder>/01-PRD.md … 06-implementation-plan.md |
 | Research and decisions | <path>/research/, <path>/decisions.md |
 | Status log | .agent-lead/status.md |
-| Checklist page | <URL or "none"> |
+| Checklist page | <published URL (private until shared) \| local: .agent-lead/checklist.html \| declined <date>> |
 
 ## 3. Start of every session
 1. Read this file, the project's AGENTS.md / CLAUDE.md, and the tail of `.agent-lead/status.md`.
 2. `git status --short` and `git log --oneline -8` in the lead checkout; the same in the worker checkout.
 3. `ls -t .agent-lead/briefs | head`: the newest brief, and whether its `.report.md` exists.
-4. Find the first open item in the checklist.
+4. Find the first open item in the checklist. Rebuild the checklist page if the plan changed since its last publish.
 5. Tell the user in two or three lines where things stand and what comes next (and the next prompt in Handoff mode).
 
 ## 4. Commands
@@ -38,6 +38,7 @@ facts. Keep section 8 current.
 | Quick check (must pass before every commit) | |
 | Tests / lint / typecheck / build | |
 | Screenshots | `node tools/shot.mjs <url> <out>` |
+| Checklist page (rebuild, then republish to the URL above) | `node <skill>/plan-page.mjs <plan.md> .agent-lead/checklist.html --title "<Project> plan"` |
 
 ## 5. Conventions
 - Commit style: <e.g. "feat: … (M2, FR-07)">. One commit per item or part. Worker trailer:

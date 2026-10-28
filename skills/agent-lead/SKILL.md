@@ -26,14 +26,16 @@ Files in this skill (read the one you need, when you need it):
 | `review.md` | Every time a worker reports: the review checklist and how to write a review round. |
 | `clis.md` | Flags, resume options and rules files of each worker CLI. |
 | `templates/` | `docs/01-PRD.md` … `docs/06-implementation-plan.md`, `LEAD.md`, `WORKER.md`, `brief.md`, `review-round.md`, `status.md`, `decisions.md`, `AGENTS.md` (pointer section), `allow-lists.md`. |
-| `plan-page.mjs` | Turns the checklist into a one-page HTML progress view: `node <skill>/plan-page.mjs <plan.md> <out.html>`. |
+| `checklist-page.md` | The checklist page every project gets: asking the user once, building it with `plan-page.mjs`, publishing it to one link and republishing after every checklist change. |
+| `plan-page.mjs` | Builds the checklist page from the plan: `node <skill>/plan-page.mjs <plan.md> .agent-lead/checklist.html --title "…"`. |
 | `worker-rules.md` | The rules `agent-run` puts in front of every Pane brief (headless, allow-listed commands). |
 
 ## 1. Start: resume or set up
 
 - **`.agent-lead/LEAD.md` exists** in the project (or in the lead checkout it names): read it fully, then do its
   "Start of every session" steps. It holds the workflow, the worker, every path, the commands, the conventions and
-  the current state. Tell the user in two or three lines where things stand and what comes next.
+  the current state. Tell the user in two or three lines where things stand and what comes next, with the checklist
+  page link. If LEAD.md has no "Checklist page" row yet, ask the user about the page once (`checklist-page.md`).
 - **It does not exist**: follow `project-setup.md`. It asks the user which workflow (Pane or Handoff) and which
   worker, wires up `.agent-lead/`, and sends you to `foundation.md` when the project has no product docs yet.
 - **Every project ends up with the six docs** (PRD, TRD, UI/UX design, app flow, backend schema, implementation plan).
@@ -76,10 +78,10 @@ round. Say so in the checklist note and to the user.
    uncommitted work.
 6. Add one line to `.agent-lead/status.md` (date, what landed with its hash, what is next, any blocker) and update
    LEAD.md's "Current state". Commit them.
-7. If the project has a checklist page, rebuild it (`plan-page.mjs`) and republish it (with the Artifact tool when
-   you have it, to the same URL).
-8. Tell the user what landed, which checklist items changed, the new totals, and what comes next. In Handoff mode,
-   end with the next prompt in its own code block.
+7. Rebuild the checklist page and republish it to the same URL (`checklist-page.md`), unless the user declined it.
+   Do this after every checklist change, not only after a ship: splits, new items and reorders too.
+8. Tell the user what landed, which checklist items changed, the new totals, the next item and the checklist page
+   link. In Handoff mode, end with the next prompt in its own code block.
 
 Never push, open a pull request, deploy or publish unless the user asks for that action.
 
@@ -99,7 +101,7 @@ Never push, open a pull request, deploy or publish unless the user asks for that
 | Facts, versions, prices, limits, docs | WebSearch and WebFetch (or `curl`), official sources first (`research.md`). |
 | Seeing and checking UI, other products' screens | Playwright with real input and screenshots (`playwright.md`); a browser extension or MCP browser tools when present. |
 | Designs | Figma or other design MCP tools when connected; screenshots and measurements otherwise. |
-| The checklist page and shareable reports | The Artifact tool when present (publish `plan-page.mjs` output to one stable URL); else a local HTML file. |
+| The checklist page and shareable reports | `checklist-page.md`: `plan-page.mjs` output published with the Artifact tool to one stable URL; else a local HTML file. |
 | Cheap code reading | Search first (`rg`), then only the needed ranges; outline tools if the project has them. |
 | Broad searches across many files | A sub-agent, only when the user allows agents; otherwise do it yourself. |
 | Worker runs | `agent-run` (Pane) or the user's own tool (Handoff). |

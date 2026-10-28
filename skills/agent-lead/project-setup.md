@@ -40,6 +40,9 @@ Skip any question the `/lead` arguments or the project already answer.
    the docs around them".
 4. **Where the worker works** — "A worktree I create next to this repo" (recommended) / "A path you give me" (for
    example one emdash made) / "This checkout" (only for tiny projects; you lose the clean review diff).
+5. **Checklist page** — "Publish a private checklist page" (recommended) / "Keep it as a local file" / "No
+   checklist page" (`checklist-page.md` section 1). With four questions above, ask this one in a second
+   AskUserQuestion right after.
 
 ## 3. The six docs and the checklist
 
@@ -61,13 +64,13 @@ Skip any question the `/lead` arguments or the project already answer.
   status.md      one dated line per step (templates/status.md)                      commit
   WORKER.md      the worker's rules for this project (templates/WORKER.md, filled)  commit
   briefs/        briefs, review rounds and worker reports                           git-ignored
-  checklist.html the progress page, when you make one                               git-ignored
+  checklist.html the checklist page, built by plan-page.mjs (checklist-page.md)  git-ignored
 ```
 
 - Fill LEAD.md completely: workflow, worker and model, every absolute path (lead checkout, worker checkout, briefs
   folder, checklist), the commands from step 1, the commit style, the review checks that matter for this project
-  (UI screenshots, API contract tests, migrations, accessibility…), the checklist page URL if any, and the current
-  state. A new session must be able to continue from it alone.
+  (UI screenshots, API contract tests, migrations, accessibility…), the checklist page (URL, local, or declined with
+  the date), and the current state. A new session must be able to continue from it alone.
 - Git-ignore `briefs/` and `checklist.html` locally: add `.agent-lead/briefs/` and `.agent-lead/checklist.html` to
   `.git/info/exclude` (shared by every worktree), not to `.gitignore`, unless the user wants it in the repo.
 - Point the agents at the files:
@@ -93,6 +96,7 @@ Skip any question the `/lead` arguments or the project already answer.
 
 ## 6. Finish
 
-Tell the user, briefly: the workflow, the worker, where the six docs and the checklist are (and the page link if you
-made one), what you created, the first item. Then start the loop (SKILL.md section 2) with that item, usually M0:
+Build and publish the checklist page as the user chose (`checklist-page.md`). Then tell the user, briefly: the
+workflow, the worker, where the six docs and the checklist are, the checklist page link (private until they share
+it), what you created, the first item. Then start the loop (SKILL.md section 2) with that item, usually M0:
 write its brief and either launch it (Pane) or give the paste-ready prompt (Handoff).
