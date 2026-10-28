@@ -35,9 +35,14 @@ facts. Keep section 8 current.
 | --- | --- |
 | Install (lead only) | |
 | Dev server (lead uses port <n>, worker <m>) | |
-| Quick check (must pass before every commit) | |
-| Tests / lint / typecheck / build | |
-| Screenshots | `node tools/shot.mjs <url> <out>` |
+| Next item, with the files to read | `node <skill>/tools/next.mjs` |
+| Quick check (must pass before every commit) | `node <skill>/tools/check.mjs` |
+| Ship one item (checks, plan, page, commit) | `node <skill>/tools/ship.mjs "<item text>" "<subject>" --coauthor "<worker> <email>"` |
+| Merge the worker's branch | `node <skill>/tools/land.mjs <worker branch>` |
+| Real input in the app, screenshots | `node <skill>/tools/play.mjs --url <dev url> <steps>` |
+| The reference product (if any) | `node <skill>/tools/observe.mjs <steps>` |
+| Layout, tap-target and contrast audit | `node <skill>/tools/audit-ui.mjs --routes "/,…"` |
+| Shared resource lock (parallel workers) | `node <skill>/tools/lock.mjs take\|release <name> <holder>` |
 | Checklist page (rebuild, then republish to the URL above) | `node <skill>/plan-page.mjs <plan.md> .agent-lead/checklist.html --title "<Project> plan"` |
 
 ## 5. Conventions

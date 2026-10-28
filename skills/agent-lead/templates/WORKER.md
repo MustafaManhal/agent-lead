@@ -10,9 +10,13 @@ brief asks, completely, and nothing outside it.
 3. Build it, matching the surrounding code (naming, comments, formatting). Use the design tokens and components;
    never hard-code colors or sizes the system defines.
 4. Write tests for the new logic, including a case that must not match or must fail.
-5. Check it in the running app with real input (`<screenshot/playwright command>`): phone and desktop width, light
+5. Check it in the running app with real input (`node <skill>/tools/play.mjs --url <dev url> …`): phone and desktop width, light
    and dark when the project has both, keyboard, empty and error states. Save screenshots and list their paths.
-6. Fix what you find. Run `<check command>` until it passes.
+6. Fix what you find. Run `node <skill>/tools/check.mjs` until it prints OK.
+
+Tools you may use (`<skill>/tools.md`): `next`, `check`, `outline`, `show`, `rep`, `snippet`, `play`, `observe`,
+`audit-ui`, `research.py`, `ask` and `lock` (take the lock the brief names before using a shared resource, release it
+right after). Not `ship`, `done` or `land`: they change the plan or commit.
 7. Write the report (below), then stop.
 
 ## Never

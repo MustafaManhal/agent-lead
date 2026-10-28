@@ -1,0 +1,26 @@
+{
+  "plan": "docs/06-implementation-plan.md",
+  "checks": [
+    { "name": "types", "run": "npx tsc --noEmit -p ." },
+    { "name": "tests", "run": "npx vitest run --reporter=dot" }
+  ],
+  "page": {
+    "out": ".agent-lead/checklist.html",
+    "title": "My project plan",
+    "lede": "One sentence about what the plan delivers.",
+    "sections": null
+  },
+  "commitPaths": ["."],
+  "progressLog": null,
+  "notes": ["docs", "research"],
+  "sources": ["src"],
+  "sourceExts": [".ts", ".tsx"],
+  "devUrl": "http://localhost:5173/",
+  "reference": {
+    "url": "https://example.com/the-product-you-match",
+    "profile": "~/.config/agent-lead/browser-profile",
+    "port": 9333,
+    "browser": null
+  },
+  "locks": "/tmp"
+}

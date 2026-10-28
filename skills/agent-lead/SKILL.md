@@ -27,6 +27,7 @@ Files in this skill (read the one you need, when you need it):
 | `clis.md` | Flags, resume options and rules files of each worker CLI. |
 | `templates/` | `docs/01-PRD.md` … `docs/06-implementation-plan.md`, `LEAD.md`, `WORKER.md`, `brief.md`, `review-round.md`, `status.md`, `decisions.md`, `AGENTS.md` (pointer section), `allow-lists.md`. |
 | `checklist-page.md` | The checklist page every project gets: asking the user once, building it with `plan-page.mjs`, publishing it to one link and republishing after every checklist change. |
+| `tools.md` and `tools/` | Command-line tools for every project: `next`, `check`, `done`, `ship`, `land` for the item loop; `outline`, `show`, `rep`, `snippet` for cheap code reading; `play`, `observe`, `audit-ui` and macOS helpers for seeing the app and the product it matches; `research`, `ask`, `lock`. Set them up during project setup. |
 | `plan-page.mjs` | Builds the checklist page from the plan: `node <skill>/plan-page.mjs <plan.md> .agent-lead/checklist.html --title "…"`. |
 | `worker-rules.md` | The rules `agent-run` puts in front of every Pane brief (headless, allow-listed commands). |
 
@@ -46,7 +47,7 @@ Files in this skill (read the one you need, when you need it):
 
 ## 2. The loop for one item (both workflows)
 
-1. **Pick the item** strictly in checklist order: the first open item, or its first open part. Never skip ahead
+1. **Pick the item** strictly in checklist order (`tools/next.mjs` prints it with the files to read): the first open item, or its first open part. Never skip ahead
    because something looks easier or more interesting. New findings become new checklist items, not code. Split a
    big item into parts a, b, c in the checklist first (one commit per part) and show the user the split.
 2. **Prepare just enough** to write a precise brief: the relevant files (declarations and the parts you need, not
@@ -68,7 +69,8 @@ round. Say so in the checklist note and to the user.
 
 ## 3. Ship and record
 
-1. Run the project's checks in the worker's checkout (LEAD.md lists them). They must pass.
+1. Run the project's checks in the worker's checkout (`tools/check.mjs`, or the command LEAD.md names). They must
+   pass. `tools/ship.mjs` does steps 1-3 and the page rebuild in one go, and `tools/land.mjs` does step 4.
 2. Commit on the worker's branch, one commit per finished item or part, in the project's commit style (LEAD.md).
    Credit the worker with a `Co-Authored-By: <worker> <email>` trailer, plus your own attribution line if your
    instructions give one. Your own parallel work (section 6) has no worker trailer.

@@ -86,6 +86,15 @@ Skip any question the `/lead` arguments or the project already answer.
 - Commit LEAD.md, status.md, WORKER.md and the pointer edits in one commit ("agent-lead: project playbook
   and checklist"), unless the user prefers to keep them uncommitted.
 
+## 4b. Tools
+
+Set up the command-line tools (`tools.md`): run `node <skill>/tools/check.mjs` in the project; if it does not
+find the right checks, or the plan is not where it looks, write `.agent-lead/config.json` from
+`tools/config.example.json` with only the keys that differ. Put the tool commands, with the full `<skill>` path, in
+LEAD.md section 4 and WORKER.md, so every session and every worker uses the same ones. When the project matches a
+reference product, set `reference` and tell the user that `observe.mjs start` opens a separate browser where they
+sign in once.
+
 ## 5. The worker's checkout
 
 - **You create it**: `git worktree add ../<repo>-worker -b agent-lead/worker <lead branch>`. Install dependencies
