@@ -19,7 +19,7 @@ setup questions if a slot is free, otherwise right after them):
 - "Keep it as a local file": `.agent-lead/checklist.html`, rebuilt the same way; the user opens it in a browser.
 - "No checklist page": the plan file is enough.
 
-Without the Artifact tool, offer only the last two. Record the answer in LEAD.md section 2 ("Checklist page": the
+Without the Artifact tool (any lead that is not Claude Code), offer only the last two. Record the answer in LEAD.md section 2 ("Checklist page": the
 URL, `local: .agent-lead/checklist.html`, or `declined <date>`). An existing project whose LEAD.md has no such row
 gets the question once, at the start of the next session. A user who declined is not asked again unless they bring
 it up.
@@ -30,7 +30,9 @@ it up.
 node <skill>/plan-page.mjs <plan.md> .agent-lead/checklist.html --title "<Project> plan" [--lede "<one sentence>"] [--sections "<regex>"]
 ```
 
-- `<skill>` is this skill's folder (the plugin cache path, e.g. `~/.claude/plugins/cache/agent-lead/agent-lead/<version>/skills/agent-lead`).
+- `<skill>` is this skill's folder: the plugin cache path in Claude Code
+  (`~/.claude/plugins/cache/agent-lead/agent-lead/<version>/skills/agent-lead`), or `~/.agents/skills/agent-lead`
+  in other agents.
 - Markers: `- [x]` done, `- [~]` in progress, `- [ ]` not started; indented lines continue an item; inline
   `[x] a. …` markers are the item's parts and show as a list with their own status.
 - Milestones are `##` sections that hold items, or `###` headings named like `M1. …`, `Phase 2 — …`, `Milestone 3:`.

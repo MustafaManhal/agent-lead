@@ -1,6 +1,7 @@
 # agent-lead
 
-Make Claude Code the **lead** of your project and another coding agent the **worker**. Works in any project.
+Make Claude Code the **lead** of your project and another coding agent the **worker**. Works in any project. Codex,
+Gemini CLI, OpenCode and Cursor can be the lead too ([install for other agents](#codex-gemini-cli-opencode-cursor-and-other-agents)).
 
 - **The lead (Claude Code)** asks the right questions, does the research, writes the six product docs (PRD, TRD,
   UI/UX design, app flow, backend schema, implementation plan), keeps the checklist, writes a brief per item,
@@ -80,6 +81,41 @@ From a shell: `claude plugin install agent-lead --marketplace MustafaManhal/agen
 to the prompt box, Plugins, Add marketplace `MustafaManhal/agent-lead`, then Add plugin.
 
 Already installed? Update it (`/plugin update agent-lead`, or reinstall), then run `/reload-plugins`.
+
+### Codex, Gemini CLI, OpenCode, Cursor and other agents
+
+The skill is a standard `SKILL.md` folder (the open Agent Skills format), so other agents can be the lead too.
+Codex, Gemini CLI, OpenCode and Cursor all read skills from `~/.agents/skills/`. Install it once there:
+
+```bash
+git clone https://github.com/MustafaManhal/agent-lead.git ~/.agent-lead
+mkdir -p ~/.agents/skills
+ln -s ~/.agent-lead/skills/agent-lead ~/.agents/skills/agent-lead
+```
+
+Update later with `git -C ~/.agent-lead pull`. Then restart the agent and start it in your project:
+
+| Agent | Where it finds the skill | Start the lead |
+| --- | --- | --- |
+| Codex (CLI, IDE extension) | `~/.agents/skills/` (all projects) or `.agents/skills/` in the repo | `$agent-lead`, or pick it from `/skills` |
+| Gemini CLI | `~/.agents/skills/` or `~/.gemini/skills/`; `.agents/skills/` or `.gemini/skills/` in the repo | Ask "use the agent-lead skill and lead this project"; `/skills list` shows it, `/skills reload` picks up a new folder |
+| OpenCode | `~/.agents/skills/`, `~/.config/opencode/skills/` or `~/.claude/skills/`; the same under `.agents/`, `.opencode/` or `.claude/` in the repo | Ask "use the agent-lead skill and lead this project" |
+| Cursor | `~/.agents/skills/` or `~/.cursor/skills/`; `.agents/skills/` or `.cursor/skills/` in the repo | `/agent-lead` in Agent chat |
+| Any other agent | Point it at the files: "read `~/.agent-lead/skills/agent-lead/SKILL.md` and lead this project" | |
+
+To share the skill with a team through the repo instead, copy (or add as a git submodule)
+`skills/agent-lead` into the project's `.agents/skills/agent-lead`.
+
+What changes when the lead is not Claude Code:
+- No `/lead` command: ask for the skill by name, as above.
+- No `/agent` pane, so use the Handoff workflow (you paste each brief into the worker), or let the lead start
+  the worker CLI from its own shell.
+- The checklist page is kept as a local file, `.agent-lead/checklist.html` (publishing it as a private link uses
+  Claude's Artifact tool). Open it in a browser.
+- Questions come as plain chat messages instead of option pickers.
+- The tools work the same: `node ~/.agents/skills/agent-lead/tools/check.mjs` and the rest (`tools.md`).
+
+Workers need nothing installed: any coding agent CLI can be the worker in either workflow.
 
 ## Pane mode setup (once per machine)
 

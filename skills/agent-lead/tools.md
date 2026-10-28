@@ -6,7 +6,8 @@ git top level is the project root) and read one optional settings file, `.agent-
 detect what they need: the plan file, and the checks from `package.json` scripts, `tsconfig.json`,
 `pyproject.toml`, `Cargo.toml` or `go.mod`.
 
-`<skill>` is this skill's folder: `~/.claude/plugins/cache/agent-lead/agent-lead/<version>/skills/agent-lead`.
+`<skill>` is this skill's folder: `~/.claude/plugins/cache/agent-lead/agent-lead/<version>/skills/agent-lead` in
+Claude Code, `~/.agents/skills/agent-lead` when installed for Codex, Gemini CLI, OpenCode or Cursor (README).
 Write the full path into the project's LEAD.md and briefs (section 4, Commands), so workers can run them too.
 
 ## Setup in a project (once, during project setup)
