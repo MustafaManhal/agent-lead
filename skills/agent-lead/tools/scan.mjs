@@ -431,7 +431,16 @@ async function crawl(run) {
     const waited = await page.evaluate(([q, m]) => (window.__scanQuiet ? window.__scanQuiet(q, m) : null), [120, ms]).catch(() => null)
     if (waited == null) await sleep(ms)
   }
-  const runSetup = async () => { if (setupCode) await page.evaluate(`(async () => {\n${setupCode}\n})()`).catch((e) => console.log(`  setup failed: ${String(e.message).split('\n')[0]}`)) }
+  // The setup can fail while an app is still settling after a load (Figma is read-only for a moment): retry.
+  const runSetup = async () => {
+    if (!setupCode) return
+    for (let i = 0; i < 3; i++) {
+      const err = await page.evaluate(`(async () => {\n${setupCode}\n})()`).then(() => null, (e) => String(e.message).split('\n')[0])
+      if (!err) return
+      if (i === 2) console.log(`  setup failed: ${err}`)
+      else await sleep(2000)
+    }
+  }
 
   const doAction = async (a) => {
     dbg('action', a.kind, a.name ?? a.key ?? a.route ?? a.selector ?? `${a.x},${a.y}`)
