@@ -51,6 +51,7 @@ Write the full path into the project's LEAD.md and briefs (section 4, Commands),
 | `macos/windows.swift "<app>"` | An app's windows (pid, id, title, frame) as JSON lines. |
 | `macos/input.swift --pid <pid> click\|drag\|key …` | Real input for native and Electron apps; refuses unless that app is frontmost. |
 | `macos/clip.swift set\|get\|types` | The clipboard as HTML or text, to check copy and paste between your app and another. |
+| `macos/ax-tree.swift <pid> [max]` | An app's accessibility tree, window by window plus the menu bar, as JSON lines (role, name, value, enabled, frame). Brings the app forward first (macOS lists only the current Space's windows). Used by `scan.mjs --native`. |
 | `macos/ax-enable.swift <pid>` | Turns on an Electron app's accessibility tree so tools can read and press its controls. |
 
 ## Research and shared resources

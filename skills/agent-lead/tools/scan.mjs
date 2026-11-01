@@ -190,56 +190,55 @@ async function main() {
 // ─── Desktop apps: every window's accessibility tree and screenshot, through REA ─────────────────────────────────
 
 async function nativeScan(app) {
-  const server = cfg.reaServer ?? serverFromClaude('rea')
-  if (!server) { console.log('native scan needs the "rea" MCP server in Claude Code\'s config'); return }
+  // macOS desktop app: every window's accessibility tree (role, name, value, enabled, position, size) and the menu
+  // bar with every menu item, read by macos/ax-tree.swift, plus a screenshot of each window. REA adds its own
+  // observation when it can (optional).
   const wins = execFileSync('swift', [join(toolsDir, 'macos', 'windows.swift'), app], { encoding: 'utf8' }).split('\n').filter(Boolean).map((l) => JSON.parse(l))
   if (!wins.length) { console.log(`no windows for "${app}" (is it running?)`); return }
-  // The program file, from the running process itself (wherever the app is installed).
-  const exe = execFileSync('ps', ['-o', 'comm=', '-p', String(wins[0].pid)], { encoding: 'utf8' }).trim() || null
+  const pid = wins[0].pid
   const RUN = join(OUT, 'runs', 'native')
   rmSync(RUN, { recursive: true, force: true })
   mkdirSync(join(RUN, 'states'), { recursive: true })
-  const rea = await connect(server, { timeout: 180000 })
-  const states = []
+  let nodes = []
   try {
-    if (exe) await rea.call('open_binary', { path: exe }).then(() => console.log(`REA opened ${exe}`), (e) => console.log(`REA open_binary: ${String(e.message).split('\n')[0].slice(0, 200)}`))
-    for (const w of wins) {
-      const id = String(states.length).padStart(3, '0')
-      const title = short(w.title || `${app} window`, 60)
-      const dirName = `${id}-${slug(title)}`
-      const dir = join(RUN, 'states', dirName)
-      mkdirSync(dir, { recursive: true })
-      let r
-      try { r = await rea.call('observe_native_ui', { pid: w.pid, window_id: w.window ?? w.id ?? w.windowId, accessibility: true, screenshot: true, max_nodes: 3000 }) } catch (e) {
-        const msg = String(e.message)
-        if (/AX candidates \[\]|accessibility|not trusted|permission/i.test(msg)) console.log(`  ${title}: macOS gives no accessibility access. Allow the app that runs this scan (your terminal, Emdash, the IDE) in System Settings → Privacy & Security → Accessibility (and Screen Recording for screenshots), then run again.`)
-        else console.log(`  ${title}: ${msg.split('\n')[0].slice(0, 200)}`)
-        // A screenshot of the window still helps (needs Screen Recording).
-        try { execFileSync('screencapture', ['-x', '-o', '-l', String(w.window ?? w.id), join(dir, 'shot.png')]); console.log(`  saved a screenshot of the window only: ${join(dir, 'shot.png')}`) } catch {}
-        continue
-      }
-      writeFileSync(join(dir, 'rea.json'), JSON.stringify(r))
-      // Accessibility tree as ui.txt lines, and any inline screenshot as a file.
-      const lines = []
-      const walk = (n, depth = 0) => {
-        if (!n || typeof n !== 'object') return
-        if (Array.isArray(n)) { n.forEach((x) => walk(x, depth)); return }
-        const role = n.role ?? n.AXRole
-        const name = n.title ?? n.name ?? n.label ?? n.AXTitle ?? n.description ?? ''
-        const f = n.frame ?? n.bounds
-        if (role) lines.push(`${'  '.repeat(Math.min(depth, 12))}${role} "${String(name).slice(0, 80)}"${f ? ` @${Math.round(f.x ?? f[0])},${Math.round(f.y ?? f[1])} ${Math.round(f.width ?? f.w ?? f[2])}x${Math.round(f.height ?? f.h ?? f[3])}` : ''}`)
-        for (const [k, v] of Object.entries(n)) {
-          if (k === 'data' && typeof v === 'string' && v.length > 1000 && /png|jpe?g/i.test(n.mime_type ?? n.mimeType ?? n.format ?? 'png')) writeFileSync(join(dir, `shot.${/jpe?g/i.test(n.mime_type ?? n.mimeType ?? '') ? 'jpg' : 'png'}`), Buffer.from(v, 'base64'))
-          else if (v && typeof v === 'object') walk(v, role ? depth + 1 : depth)
-        }
-      }
-      walk(r)
-      writeFileSync(join(dir, 'ui.txt'), `# ${title} (native window, pid ${w.pid})\n${lines.join('\n')}\n`)
-      states.push({ id, fp: id, kind: 'window', title, dir: dirName, url: `native:${app}`, parent: null, depth: 0, path: [], via: 'window', added: lines.length, shots: ['shot.png'] })
-      console.log(`${id} window       ${title}  ${lines.length} accessibility nodes`)
-    }
-  } finally {
-    await rea.close().catch(() => {})
+    nodes = execFileSync('swift', [join(toolsDir, 'macos', 'ax-tree.swift'), String(pid), '5000'], { encoding: 'utf8', maxBuffer: 64 << 20 }).split('\n').filter(Boolean).map((l) => JSON.parse(l))
+  } catch (e) {
+    const err = String(e.stderr ?? e.message)
+    console.log(/not trusted/.test(err) ? '  macOS gives no accessibility access: allow the app running this scan (terminal, Emdash, IDE) in System Settings → Privacy & Security → Accessibility, then run again.' : `  accessibility read failed: ${err.split('\n')[0]}`)
+  }
+  const states = []
+  const groups = new Map()
+  for (const n of nodes) { if (!groups.has(n.window)) groups.set(n.window, []); groups.get(n.window).push(n) }
+  const line = (n) => `${'  '.repeat(Math.min(n.depth, 12))}${n.role ?? '?'}${n.subrole ? `/${n.subrole}` : ''} "${n.name ?? ''}"${n.value != null ? ` value=${n.value}` : ''}${n.enabled === false ? ' disabled' : ''}${n.w ? ` @${n.x},${n.y} ${n.w}x${n.h}` : ''}`
+  for (const [w, list] of [...groups.entries()].sort((a, b) => a[0] - b[0])) {
+    const id = String(states.length).padStart(3, '0')
+    const title = short(w === -1 ? 'menu bar' : list[0].title || `${app} window ${w}`, 60)
+    const dirName = `${id}-${slug(title)}`
+    const dir = join(RUN, 'states', dirName)
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'ui.txt'), `# ${title} (${w === -1 ? 'menu bar: every menu and item' : 'window'}, ${app}, pid ${pid})\n${list.map(line).join('\n')}\n`)
+    writeFileSync(join(dir, 'ui.json'), JSON.stringify(list))
+    const shots = []
+    const cg = w === -1 ? null : wins[w] ?? wins.find((x) => x.title === list[0].title)
+    if (cg) { try { execFileSync('screencapture', ['-x', '-o', '-l', String(cg.window ?? cg.id), join(dir, 'shot.png')]); shots.push('shot.png') } catch {} }
+    const items = list.filter((n) => /Button|MenuItem|CheckBox|RadioButton|PopUpButton|TextField|Slider|Tab/.test(n.role ?? '') && n.name).map((n) => `${(n.role ?? '').replace(/^AX/, '').toLowerCase()}:${n.name}`)
+    writeFileSync(join(dir, 'info.json'), json({ id, title, kind: w === -1 ? 'menu-bar' : 'window', items, texts: [...new Set(list.map((n) => n.name).filter(Boolean))] }))
+    states.push({ id, fp: id, kind: w === -1 ? 'menu-bar' : 'window', title, dir: dirName, url: `native:${app}`, parent: null, depth: 0, path: [], via: w === -1 ? 'menu bar' : 'window', added: list.length, shots })
+    console.log(`${id} ${(w === -1 ? 'menu-bar' : 'window').padEnd(12)} ${title.padEnd(50)} ${list.length} accessibility nodes`)
+  }
+  // REA, when it can see the window too (optional).
+  const server = cfg.reaServer ?? serverFromClaude('rea')
+  if (server && states.length) {
+    let rea
+    try {
+      rea = await connect(server, { timeout: 120000 })
+      const exe = execFileSync('ps', ['-o', 'comm=', '-p', String(pid)], { encoding: 'utf8' }).trim()
+      await rea.call('open_binary', { path: exe })
+      const r = await rea.call('observe_native_ui', { pid, window_id: wins[0].window ?? wins[0].id, accessibility: true, screenshot: false, max_nodes: 3000 })
+      writeFileSync(join(RUN, 'rea-native.json'), JSON.stringify(r))
+      console.log('REA: native observation saved (rea-native.json)')
+    } catch (e) { console.log(`REA: native observation not available (${String(e.message).split('\n')[0].slice(0, 120)}); the accessibility tree above covers it`) }
+    finally { await rea?.close().catch(() => {}) }
   }
   writeFileSync(join(RUN, 'graph.json'), json({ url: `native:${app}`, label: 'native', mode: 'native', at: new Date().toISOString(), states, edges: [] }))
 }
