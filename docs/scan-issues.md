@@ -20,6 +20,9 @@ Evidence: the Figma runs of 2026-11-01 (logs in figmu `figma-research/scan/*.log
 | 15 | A click hit the wrong control | a candidate was clicked at the position read earlier; the layout had shifted | every click finds the control again by role and name and clicks where it is now | fixed 0.10.2 |
 | 16 | Tab switches seen as no change; search text lost; stuck window counter | keys ignored selected/expanded state; search action dropped its text; errors skipped cleanup | state in keys, text kept, cleanup in finally (Codex review, tests in tests/scan) | fixed 0.10.1–0.10.2 |
 | 17 | Routes run stuck reopening /files/resources | the editor's ready check (window.figma) never passes on file-browser pages | the ready check belongs to the run's start page; the routes run uses normal page loading | fixed 0.10.3 |
+| 18 | Clicked "Spotlight me" | a collaboration action other people see was not on the never-click list | spotlight, follow, observe and present-to added to the built-in list | fixed 0.10.4 |
+| 19 | INDEX.md 38 KB (~10k tokens) | the full state table lived in the index | short INDEX (overview, counts, main screens); full table in states.md | fixed 0.10.4 |
+| 20 | Few tooltips (26) | the app shows tooltips later than the hover time | plans can set tip (Figma: 1200 ms) | fixed 0.10.4 |
 | 13 | Slow on heavy pages | fixed waits, full style reads for every check | quick checks, adaptive waits, direct screenshots | fixed 0.9.0 |
 
 Test after the open fixes: the fixture page (all states, under 40 s) with volatile names and a remembered panel added to

@@ -102,7 +102,7 @@ const VIEWPORT = o.opt('--viewport') ?? PLAN.viewport ?? cfg.viewport
 const TOOLTIPS = !o.flag('--no-tooltips') && cfg.tooltips !== false
 const REA = !o.flag('--no-rea') && PLAN.rea !== false && cfg.rea !== false
 const VISIT_ROUTES = !o.flag('--no-routes')
-const TIP = Number(o.opt('--tip') ?? cfg.tip ?? 700)
+const TIP = Number(o.opt('--tip') ?? PLAN.tip ?? cfg.tip ?? 700)
 const ALLOW = o.opt('--allow') ?? cfg.allow
 const TYPE = o.opt('--type') ?? cfg.type ?? 'a'
 const SCHEME = o.opt('--color-scheme') ?? cfg.colorScheme
@@ -130,6 +130,8 @@ const SKIP = new RegExp(
     'buy', 'purchase', 'pay', 'billing', 'checkout', 'subscribe', 'sign out', 'log ?out', 'send', 'submit', 'leave',
     'archive', 'transfer', 'revoke', 'disconnect', 'uninstall', 'report', 'request', 'accept', 'decline', 'reject',
     'deactivate', 'cancel plan', 'close account', 'password', 'continue', 'allow', 'connect',
+    // Things other people see: asking collaborators to follow you, following them, presenting.
+    'spotlight', 'follow', 'observe', 'present to',
     ...(cfg.skip ?? []),
     ...(PLAN.skip ?? []),
     o.opt('--skip'),
@@ -1029,31 +1031,31 @@ function writeIndex() {
   writeFileSync(join(OUT, 'strings.txt'), [...strings].join('\n') + '\n')
   writeFileSync(join(OUT, 'features.md'), `# Feature inventory\n\nEvery control each state shows (pages: all; menus, dialogs and the like: what they add), grouped by role, in screen order.\n\n${features.join('\n\n')}\n`)
   const total = runs.reduce((n, r) => n + r.states.length, 0)
+  // The full table goes to states.md; INDEX.md stays short (read first, a few hundred tokens).
+  writeFileSync(join(OUT, 'states.md'), `# Every state\n\n| State | Kind | Title | How to reach it | New controls | Folder |\n| --- | --- | --- | --- | --- | --- |\n${rows.join('\n')}\n`)
+  const kinds = {}
+  for (const r of rows) { const k = r.split('|')[2].trim().split(' ')[0]; kinds[k] = (kinds[k] ?? 0) + 1 }
+  const tops = rows.filter((r) => /\| (page|dialog|menu|context-menu|tab|probe|window|menu-bar)\b/.test(r)).map((r) => { const c = r.split('|').map((x) => x.trim()); return `${c[1]} ${c[2]}: ${c[3]}` })
   writeFileSync(
     join(OUT, 'INDEX.md'),
     `# Scan of ${URL_ ?? host}
 
-${total} states in ${runs.length} run(s): ${runs.map((r) => `\`${r.name}\` (${r.states.length} states, ${r.mode} mode, ${r.at.slice(0, 16).replace('T', ' ')})`).join(', ')}.
+${total} states in ${runs.length} run(s): ${runs.map((r) => `\`${r.name}\` (${r.states.length})`).join(', ')}. By kind: ${Object.entries(kinds).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(', ')}.
 
-Read this file first, then only what you need:
-- \`features.md\`: every menu, submenu, tab, dialog and panel with its items. The feature list of the app.
-- \`tokens.md\`: fonts, colors, radii, shadows, spacing, most used first (\`tokens.json\` for all).
-- \`strings.txt\`: every visible text, for exact wording.
-- \`runs/<run>/states/<id>-<name>/\`: \`shot.jpg\` (the screen), \`opened.png\` (just what opened), \`regions/*.png\`
-  (panels and bars of a page), \`ui.txt\` (controls: role "name" @x,y wxh state), \`styles.json\`, \`info.json\`.
-- \`runs/<run>/graph.json\`: every state and transition (how to reach it, what each control opens).
-- \`routes.md\` and \`api.md\`: every route and API endpoint REA found in the app's code (the \`routes\` run visited
-  the concrete ones; a kind \`page → /other\` means the route redirected: not open to this account or needs an id).
-- More per state when present: \`motion/*.jpg\` (frames while it opened), \`scroll/*.jpg\` (panels scrolled; their
-  controls are in \`ui.txt\` marked "scrolled into view"), \`icons/*.png\` (reference only), \`aria.yml\`.
-- \`rea.md\`: REA follow-ups the scan could not run by itself.
+Read only what you need:
+- \`features.md\`: every menu, submenu, tab, dialog and panel with its items (the feature list).
+- \`states.md\`: every state in one table (kind, title, how to reach it, folder).
+- \`tokens.md\` (\`tokens.json\`): fonts, colors, radii, shadows, spacing, motion, most used first.
+- \`strings.txt\`: every visible text. \`routes.md\`, \`api.md\`: routes and API endpoints from the app's code (REA).
+- \`runs/<run>/states/<id>-<name>/\`: \`ui.txt\` (controls: role "name" @x,y wxh, state, tooltip, hover color), \`ui.json\`
+  (exact style of each control), \`shot.jpg\`, \`opened.png\`, \`regions/\`, \`icons/\` (reference only), \`motion/\`, \`scroll/\`.
+- \`rea.md\`: REA follow-ups the scan could not run itself.
 
-Open a picture only when the text is not enough. Match exact wording from \`ui.txt\`/\`strings.txt\` and exact
-values from \`styles.json\`/\`tokens.md\`; never copy the app's code, icons or images.
+Match wording from \`ui.txt\`/\`strings.txt\` and values from \`ui.json\`/\`tokens.md\`; open pictures only when text is not enough;
+never copy the app's code, icons or images.
 
-| State | Kind | Title | How to reach it | New controls | Folder |
-| --- | --- | --- | --- | --- | --- |
-${rows.join('\n')}
+## Main screens (pages, dialogs, menus, tabs)
+${tops.slice(0, 60).map((t) => `- ${t}`).join('\n')}${tops.length > 60 ? `\n- … ${tops.length - 60} more in states.md` : ''}
 `,
   )
   console.log(`index: ${join(OUT, 'INDEX.md')} (${total} states)`)
