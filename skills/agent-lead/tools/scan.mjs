@@ -479,6 +479,22 @@ async function crawl(run) {
     await settle(a.kind === 'route' ? LOAD : a.kind === 'wait' ? 0 : WAIT)
   }
   let frames = []
+  // Replay a path of clicks after a reload or in a fresh tab. Each step's control must be on screen again (same
+  // role and name); it is clicked where it is now. A missing control stops the replay instead of clicking blindly
+  // at the old position (that once hit Figma's Dev Mode switch and left the file read-only).
+  const replay = async (path) => {
+    for (const a of path) {
+      if (a.role && a.name) {
+        if (SKIP.test(a.name)) return false
+        const now = await collect(true).catch(() => null)
+        const hits = (now?.controls ?? []).filter((c) => c.role === a.role && c.name === a.name)
+        if (!hits.length) { dbg('replay: missing', a.role, a.name); return false }
+        const best = hits.sort((p, q) => Math.hypot(p.x + p.w / 2 - a.x, p.y + p.h / 2 - a.y) - Math.hypot(q.x + q.w / 2 - a.x, q.y + q.h / 2 - a.y))[0]
+        await doAction({ ...a, x: Math.round(best.x + best.w / 2), y: Math.round(best.y + best.h / 2) })
+      } else await doAction(a)
+    }
+    return true
+  }
   const describe = (a) =>
     a.kind === 'key' ? `key ${a.key}` : a.kind === 'route' ? `go to ${a.route}` : a.kind === 'type' ? `type "${short(a.text, 20)}"` : a.kind === 'search' ? `search "${a.text}" in ${a.role} "${short(a.name, 30)}"` : a.kind === 'wait' ? `wait ${a.ms} ms` : a.kind === 'drag' ? `drag ${a.x},${a.y} → ${a.x2},${a.y2}` : a.kind === 'dblclick' ? `double-click ${a.x},${a.y}` : `${{ click: 'click', right: 'right-click', hover: 'hover' }[a.kind]} ${a.role ? `${a.role} "${short(a.name, 40)}"` : a.selector ?? `${a.x},${a.y}`}`
 
@@ -490,7 +506,7 @@ async function crawl(run) {
       if (i === 4) { await runSetup(); await settle() }
       const snap = await collect(true).catch(() => null)
       if (snap && sameAs(snap, states[0])) {
-        for (const a of path) await doAction(a)
+        if (!(await replay(path))) return false
         return true
       }
       if (snap && new URL(snap.url).pathname !== new URL(states[0].url).pathname) return false
@@ -548,7 +564,7 @@ async function crawl(run) {
         await settle(WAIT * 3)
         await runSetup()
         await settle()
-        for (const a of path) await doAction(a)
+        await replay(path)
         return
       }
     }
@@ -572,7 +588,7 @@ async function crawl(run) {
     await settle(READY ? WAIT * 3 : LOAD)
     await runSetup()
     await settle()
-    for (const a of path) await doAction(a)
+    await replay(path)
   }
   const goBackTo = async (state) => {
     dbg('back to', state.id)
@@ -583,7 +599,7 @@ async function crawl(run) {
       await settle(WAIT * 3)
       await runSetup()
       await settle()
-      for (const a of state.path) await doAction(a).catch(() => {})
+      await replay(state.path).catch(() => false)
       const snap0 = await collect(true).catch(() => null)
       if (snap0 && sameAs(snap0, state)) return true
     }
