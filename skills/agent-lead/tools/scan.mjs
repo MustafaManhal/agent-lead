@@ -351,17 +351,20 @@ async function crawl(run) {
   scanPages.add(page)
   const context = page.context()
   const opened = []
+  const openedPages = new Set()
   // Tabs the app opens are closed (after a moment, so a window another run is opening is never mistaken for one).
   const onPage = (p) => {
     const check = () => {
       if (scanPages.has(p) || p.isClosed()) return
       if (pendingWindows > 0) return setTimeout(check, 1000) // another run is still finding its new window
       opened.push(p.url())
+      openedPages.add(p)
       p.close().catch(() => {})
     }
     setTimeout(check, 1500)
   }
   context.on('page', onPage)
+  try {
   // Leave-page prompts are accepted (a reload is how the scan goes back); every other dialog is dismissed.
   page.on('dialog', (d) => (d.type() === 'beforeunload' ? d.accept() : d.dismiss()).catch(() => {}))
   await page.bringToFront().catch(() => {})
@@ -869,6 +872,13 @@ async function crawl(run) {
         const visible = cur.controls.some((x) => x.role === c.role && x.name === c.name && Math.abs(x.x + x.w / 2 - c.x) < 6 && Math.abs(x.y + x.h / 2 - c.y) < 6)
         const ready = sameAs(cur, state) || (c.kind === 'hover' && visible && [...stateKeys].every((k) => curKeys.has(k)) && [...curKeys].filter((k) => !stateKeys.has(k)).every((k) => k.startsWith('menuitem') || k.startsWith('[menu]')))
         if (!ready && !(await goBackTo(state))) { console.log(`  could not return to ${state.id}; skipping the rest of it`); return }
+        // Click the control where it is now (the layout can shift a little): same role and name, nearest one.
+        const live = ready && !first ? cur : await collect(true).catch(() => null)
+        const hits = (live?.controls ?? []).filter((x) => x.role === c.role && x.name === c.name)
+        if (!hits.length) continue
+        const at = hits.sort((p, q) => Math.hypot(p.x + p.w / 2 - c.x, p.y + p.h / 2 - c.y) - Math.hypot(q.x + q.w / 2 - c.x, q.y + q.h / 2 - c.y))[0]
+        c.x = Math.round(at.x + at.w / 2)
+        c.y = Math.round(at.y + at.h / 2)
         await doAction(c)
         if (allowRe?.test(c.name) || (MODE_ === 'wide' && ACTION.test(c.name))) changedDoc++
         // A quick look decides; the full read (styles, regions, texts) only for a new state.
@@ -945,13 +955,15 @@ async function crawl(run) {
   }
   await goBackTo(root).catch(() => {})
   if (run.teardown) await page.evaluate(`(async () => {\n${readFileSync(abs(run.teardown), 'utf8')}\n})()`).catch((e) => console.log(`  teardown failed: ${String(e.message).split('\n')[0]}`))
-  context.off('page', onPage)
-
   writeFileSync(join(RUN, 'graph.json'), json({ url: URL_, label, mode: MODE_, setup: run.setup ?? null, entries: run.entries, at: new Date().toISOString(), seconds: Math.round((Date.now() - t0) / 1000), states: states.map(({ snap, items, ownKeys, ...s }) => s), edges }))
   writeFileSync(join(OUT, 'rea.md'), reaNotes(page, list))
   console.log(`\n${states.length} states, ${edges.length} transitions in ${Math.round((Date.now() - t0) / 1000)} s → ${RUN}`)
-  if (run.ownWindow) await (await windowSession).send('Target.closeTarget', { targetId: run.targetId }).catch(() => page.close().catch(() => {}))
-  scanPages.delete(page)
+  } finally {
+    context.off('page', onPage)
+    await Promise.all([...openedPages].map((p) => p.close().catch(() => {})))
+    if (run.ownWindow && run.targetId) await (await windowSession).send('Target.closeTarget', { targetId: run.targetId }).catch(() => page.close().catch(() => {}))
+    scanPages.delete(page)
+  }
 }
 
 function reaNotes(page, list) {

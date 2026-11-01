@@ -17,6 +17,8 @@ Evidence: the Figma runs of 2026-11-01 (logs in figmu `figma-research/scan/*.log
 | 11 | Lists with live content differ (libraries, community, variables) | content loads late or changes | near-duplicate match (Yandrapally et al., ICSE 2020): 80% of the state's own controls and 70% of everything | fixed 0.10.0 |
 | 12 | Same menus explored again in every run | each run starts from scratch | per-run skip lists (plans) | fixed 0.8.x |
 | 14 | Many reloads to go back | Escape cannot undo a tab switch, an opened side panel or a document change | select the state's tab/panel again, then undo (--undo) before reloading; fresh tabs come to the front at once | fixed 0.10.1 |
+| 15 | A click hit the wrong control | a candidate was clicked at the position read earlier; the layout had shifted | every click finds the control again by role and name and clicks where it is now | fixed 0.10.2 |
+| 16 | Tab switches seen as no change; search text lost; stuck window counter | keys ignored selected/expanded state; search action dropped its text; errors skipped cleanup | state in keys, text kept, cleanup in finally (Codex review, tests in tests/scan) | fixed 0.10.1–0.10.2 |
 | 13 | Slow on heavy pages | fixed waits, full style reads for every check | quick checks, adaptive waits, direct screenshots | fixed 0.9.0 |
 
 Test after the open fixes: the fixture page (all states, under 40 s) with volatile names and a remembered panel added to

@@ -21,8 +21,10 @@ test('sameAs matches volatile labels and rejects another path', () => {
   const reloaded = snap([control('heading', 'Canvas 83%'), control('button', 'Help')])
   assert.equal(sameAs(reloaded, state), true)
   assert.equal(sameAs(snap(reloaded.controls, '/second'), state), false)
-  const tabState = { ...state, fp: 'tab-fp', snap: snap([...initial.controls, control('tab', 'Activity', { state: { selected: 'true' } })]), ownKeys: [] }
-  assert.equal(sameAs(tabState.snap, state), false, 'a tab with a different selected item is a different screen')
+  const tabs = snap([control('tab', 'Overview', { state: { selected: 'true' } }), control('tab', 'Activity')])
+  const selected = snap([control('tab', 'Overview'), control('tab', 'Activity', { state: { selected: 'true' } })])
+  const tabState = { url: tabs.url, snap: tabs, fp: 'tab-fp', ownKeys: [] }
+  assert.equal(sameAs(selected, tabState), false, 'a tab with a different selected item is a different screen')
   assert.equal(keysOf(reloaded).size, 2)
 })
 
@@ -40,6 +42,7 @@ test('candidate rules skip destructive/disabled controls and prioritize controls
   assert.equal(out.some((c) => c.kind === 'click' && c.name === 'Create new'), false) // the cap applies after prioritization
   const search = candidates(snap([control('searchbox', 'Search')]), new Set(), policy())[0]
   assert.equal(search.text, 'a')
+  assert.equal(candidates(snap([control('button', 'Create new')]), new Set(), policy({ typeText: '', allowRe: /Create/ })).length, 1, 'allow may opt a non-destructive action name back in')
 })
 
 test('safe mode only opens declared popups, while wide mode still respects destructive names', () => {

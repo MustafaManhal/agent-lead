@@ -14,7 +14,7 @@ const { chromium } = playwrightRequire('playwright')
 const fixture = `<!doctype html><html><head><title>Scan fixture</title><style>
 body{font:15px sans-serif;margin:24px;color:#222}button,a,input{margin:5px;padding:9px}#menu,#submenu{display:none;position:absolute;background:white;border:1px solid #aaa;padding:8px}#menu.open,#submenu.open{display:block}#submenu{left:115px;top:44px}.scroll{height:100px;width:300px;overflow-y:auto;border:1px solid #888}.row{height:42px}.icon{width:24px;height:24px}.tip{display:none;position:absolute;background:#111;color:white;padding:6px}.icon-wrap:hover .tip{display:block}dialog[open]{border:1px solid #444}
 </style></head><body>
-<h1>Start screen</h1><p id="zoom"></p>
+<h1>Start screen</h1><div id="zoom" role="region" aria-label="Zoom level __ZOOM__%">Zoom level __ZOOM__%</div>
 <button id="file" aria-haspopup="menu" aria-expanded="false">File</button><div id="menu" role="menu"><div role="menuitem" id="more">More options</div><div id="submenu" role="menu"><div role="menuitem">Preferences</div></div></div>
 <div role="tablist"><button role="tab" id="tab1" aria-selected="true">Overview</button><button role="tab" id="tab2" aria-selected="false">Activity</button></div><section id="panel">Overview panel</section>
 <button id="details">Details</button><dialog id="dialog" aria-label="Details"><h2>Details panel</h2><p>Dialog content</p></dialog>
@@ -23,7 +23,6 @@ body{font:15px sans-serif;margin:24px;color:#222}button,a,input{margin:5px;paddi
 <a href="/second">Second page</a>
 <span class="icon-wrap"><button aria-label="Help"><svg class="icon"><title>Question mark</title><circle cx="12" cy="12" r="8"/></svg></button><span class="tip" role="tooltip">Help tooltip</span></span>
 <button id="delete">Delete</button><script>
-document.getElementById('zoom').textContent='Zoom level '+Math.floor(Math.random()*10000)+'%';
 const file=document.getElementById('file'),menu=document.getElementById('menu'),more=document.getElementById('more'),sub=document.getElementById('submenu');file.onclick=()=>{menu.classList.toggle('open');file.setAttribute('aria-expanded',menu.classList.contains('open'))};more.onmouseenter=()=>sub.classList.add('open');
 for(const t of document.querySelectorAll('[role=tab]'))t.onclick=()=>{for(const x of document.querySelectorAll('[role=tab]'))x.setAttribute('aria-selected',String(x===t));document.getElementById('panel').textContent=t.textContent+' panel'};
 document.getElementById('details').onclick=()=>document.getElementById('dialog').showModal();document.getElementById('dialog').onkeydown=e=>{if(e.key==='Escape')document.getElementById('dialog').close()};
@@ -42,7 +41,7 @@ test('scan crawls local fixture safely and recognizes start screen after volatil
     if (req.url === '/telemetry') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ loads, deletes })); return }
     if (req.url !== '/' && req.url !== '/favicon.ico') { res.writeHead(404); res.end(); return }
     loads++
-    res.writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' }); res.end(fixture)
+    res.writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' }); res.end(fixture.replaceAll('__ZOOM__', String(loads * 10)))
   })
   await new Promise((resolve) => server.listen(9556, '127.0.0.1', resolve))
   let browser
@@ -81,6 +80,7 @@ test('scan crawls local fixture safely and recognizes start screen after volatil
     assert.ok(graph.edges.some((e) => /search "a" in searchbox/.test(e.action)), 'search action should be explored')
     assert.ok((await readdir(join(rootDir, 'scroll'))).some((f) => f.endsWith('.jpg')), 'scrollable content should be captured')
     assert.ok(loads >= 2, `expected reload/navigation, saw ${loads} root loads`)
+    assert.ok(graph.edges.some((e) => e.action.includes('Back to start') && e.to === '000'), 'reloaded start screen with a new zoom number should match the original state')
     assert.equal(deletes, 0, 'Delete button must never be activated')
     assert.doesNotMatch(stdout, /could not return to 000/)
   } finally {
