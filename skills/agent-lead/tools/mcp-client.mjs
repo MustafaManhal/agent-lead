@@ -58,7 +58,7 @@ export async function connect({ command, args = [], env = {} }, { timeout = 1200
     /** Call a tool; returns its structured result (or the parsed JSON of its first text block). */
     async call(tool, args, ms = timeout) {
       const r = await request('tools/call', { name: tool, arguments: args }, ms)
-      if (r.isError) throw new Error(r.content?.map((c) => c.text).join(' ').slice(0, 300) || `${tool} failed`)
+      if (r.isError) throw new Error(r.content?.map((c) => c.text).join(' ') || `${tool} failed`)
       if (r.structuredContent) return r.structuredContent
       const text = r.content?.find((c) => c.type === 'text')?.text ?? ''
       try { return JSON.parse(text) } catch { return text }

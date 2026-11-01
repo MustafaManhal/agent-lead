@@ -185,15 +185,15 @@ async function nativeScan(app) {
   if (!server) { console.log('native scan needs the "rea" MCP server in Claude Code\'s config'); return }
   const wins = execFileSync('swift', [join(toolsDir, 'macos', 'windows.swift'), app], { encoding: 'utf8' }).split('\n').filter(Boolean).map((l) => JSON.parse(l))
   if (!wins.length) { console.log(`no windows for "${app}" (is it running?)`); return }
-  const bundle = [`/Applications/${app}.app`, join(homedir(), 'Applications', `${app}.app`)].find((p) => existsSync(p))
-  const exe = bundle ? join(bundle, 'Contents', 'MacOS', execFileSync('plutil', ['-extract', 'CFBundleExecutable', 'raw', join(bundle, 'Contents', 'Info.plist')], { encoding: 'utf8' }).trim()) : null
+  // The program file, from the running process itself (wherever the app is installed).
+  const exe = execFileSync('ps', ['-o', 'comm=', '-p', String(wins[0].pid)], { encoding: 'utf8' }).trim() || null
   const RUN = join(OUT, 'runs', 'native')
   rmSync(RUN, { recursive: true, force: true })
   mkdirSync(join(RUN, 'states'), { recursive: true })
   const rea = await connect(server, { timeout: 180000 })
   const states = []
   try {
-    if (exe) await rea.call('open_binary', { path: exe }).catch((e) => console.log(`REA open_binary: ${String(e.message).split('\n')[0]}`))
+    if (exe) await rea.call('open_binary', { path: exe }).then(() => console.log(`REA opened ${exe}`), (e) => console.log(`REA open_binary: ${String(e.message).split('\n')[0].slice(0, 200)}`))
     for (const w of wins) {
       const id = String(states.length).padStart(3, '0')
       const title = short(w.title || `${app} window`, 60)
@@ -201,7 +201,14 @@ async function nativeScan(app) {
       const dir = join(RUN, 'states', dirName)
       mkdirSync(dir, { recursive: true })
       let r
-      try { r = await rea.call('observe_native_ui', { pid: w.pid, window_id: w.id ?? w.windowId, accessibility: true, screenshot: true, max_nodes: 3000 }) } catch (e) { console.log(`  ${title}: ${String(e.message).split('\n')[0]}`); continue }
+      try { r = await rea.call('observe_native_ui', { pid: w.pid, window_id: w.window ?? w.id ?? w.windowId, accessibility: true, screenshot: true, max_nodes: 3000 }) } catch (e) {
+        const msg = String(e.message)
+        if (/AX candidates \[\]|accessibility|not trusted|permission/i.test(msg)) console.log(`  ${title}: macOS gives no accessibility access. Allow the app that runs this scan (your terminal, Emdash, the IDE) in System Settings → Privacy & Security → Accessibility (and Screen Recording for screenshots), then run again.`)
+        else console.log(`  ${title}: ${msg.split('\n')[0].slice(0, 200)}`)
+        // A screenshot of the window still helps (needs Screen Recording).
+        try { execFileSync('screencapture', ['-x', '-o', '-l', String(w.window ?? w.id), join(dir, 'shot.png')]); console.log(`  saved a screenshot of the window only: ${join(dir, 'shot.png')}`) } catch {}
+        continue
+      }
       writeFileSync(join(dir, 'rea.json'), JSON.stringify(r))
       // Accessibility tree as ui.txt lines, and any inline screenshot as a file.
       const lines = []
