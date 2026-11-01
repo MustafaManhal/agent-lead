@@ -14,7 +14,7 @@
 // visited in an extra "routes" run. The agent reads the result and needs no screenshots or measuring of its own.
 //
 // Plan file: { "url", "out", "viewport", "ready", "skip": [], "rea": true, "runs": [ { "label", "setup", "teardown",
-//   "entries", "mode", "max", "depth", "per", "viewport", "colorScheme", "allow", "type", "probes": [ { "name",
+//   "entries", "skip": [], "mode", "max", "depth", "per", "viewport", "colorScheme", "allow", "type", "probes": [ { "name",
 //   "steps": ["key:r", "drag:600,300,800,420", "dblclick:700,360", "type:Hello", "wait:300", "click:x,y"] } ] } ] }
 //   (paths relative to the project root; each run starts from the url). Probes are for what has no control to click:
 //   drawing on a canvas, dragging handles, double-clicking, typing; every step is captured.
@@ -26,7 +26,9 @@
 //                        no destructive names and no action verbs (add, create, rename, align, …). safe: only
 //                        controls that declare a popup, tabs and links. wide: full plus action verbs and
 //                        pointer-cursor elements without a role (scratch accounts and documents only).
-//   --setup <file.js>    script evaluated in the page after every (re)load, e.g. select a layer (await allowed)
+//   --setup <file.js>    script evaluated in the page after every (re)load, e.g. select a layer (await allowed).
+//                        Also reset UI the app remembers between loads (an open side panel, a mode), or the
+//                        start screen will not match after the scan opened something else.
 //   --entry <action>     extra ways in from the start state, repeatable: click:x,y  rightclick:x,y  hover:x,y
 //                        key:Meta+K  route:/path   (context menus on a canvas: rightclick). Instead of x,y a CSS
 //                        selector works too (its center): rightclick:canvas
@@ -34,6 +36,7 @@
 //   --ready <js expr>    after every load, wait until this is true (e.g. "typeof window.figma !== 'undefined'")
 //   --routes <file>      one same-site path per line (for example from REA's analyze_web_bundle) to visit too
 //   --skip <regex>       extra names never to touch (added to the built-in destructive list)
+//   --same <n> (3)       open at most n sibling states with the same structure (rows of one list), link the rest
 //   --max <n> (150)  --depth <n> (4)  --per <n> (60 candidates per state)  --wait <ms> (450)  --load <ms> (5000)
 //   --viewport 1440x900  --aria (also save Playwright's aria snapshot per state)  --port --profile (as observe.mjs)
 //   --allow <regex>      action names full mode may click anyway (scratch documents: "Add new page|New page")
@@ -42,6 +45,9 @@
 //                        window by window through REA (Electron apps: start them with --remote-debugging-port and
 //                        pass --port instead; they scan like a web app)
 //   --no-motion (no frames while things open)  --no-scroll  --no-icons
+//   --lock <name>        hold a lock.mjs lock (e.g. the shared reference browser) for the whole scan: waits for it
+//                        (a worker's lock counts as abandoned only after 2 h), refreshes it every 5 min, stops if
+//                        another holder takes it, releases it at the end
 //   --no-tooltips (also skips hover styles)  --no-rea  --no-routes (do not visit REA's routes)  --tip <ms> (700, hover time per tooltip)
 //
 // Safety: it never types, never clicks names matching the destructive list (delete, share, publish, pay, sign
@@ -64,7 +70,7 @@ if (indexOnly) args.shift()
 const planFile = o.opt('--plan')
 const PLAN = planFile ? JSON.parse(readFileSync(abs(planFile), 'utf8')) : {}
 // The app address is the first argument that is neither an option nor an option's value.
-const VALUED = new Set(['--out', '--label', '--mode', '--setup', '--entry', '--routes', '--skip', '--max', '--depth', '--per', '--wait', '--load', '--viewport', '--port', '--profile', '--tip', '--allow', '--type', '--color-scheme', '--native', '--teardown', '--ready', '--plan'])
+const VALUED = new Set(['--lock', '--same', '--out', '--label', '--mode', '--setup', '--entry', '--routes', '--skip', '--max', '--depth', '--per', '--wait', '--load', '--viewport', '--port', '--profile', '--tip', '--allow', '--type', '--color-scheme', '--native', '--teardown', '--ready', '--plan'])
 const positional = args.find((a, i) => !a.startsWith('--') && !VALUED.has(args[i - 1]))
 const URL_ = positional ?? PLAN.url ?? cfg.url ?? ref.url
 const host = URL_ ? new URL(URL_).hostname.replace(/^www\./, '') : 'app'
@@ -93,6 +99,10 @@ const NATIVE = o.opt('--native')
 const MOTION = !o.flag('--no-motion') && cfg.motion !== false
 const SCROLL = !o.flag('--no-scroll') && cfg.scroll !== false
 const ICONS = !o.flag('--no-icons') && cfg.icons !== false
+const SAME = Number(o.opt('--same') ?? cfg.same ?? 3)
+const LOCK = o.opt('--lock') ?? PLAN.lock ?? cfg.lock
+// Routes that create things, belong to the desktop app or internal tools, or change account state: never visited.
+const ROUTE_SKIP = /new|create|try|desktop|preload|test|eval|admin|settings|logout|signout|delete|billing|purchase|upgrade|invite|report|unsubscribe|checkout|jam|import|export|download|install/i
 const DEBUG = o.flag('--debug')
 const T0 = Date.now()
 const dbg = (...m) => DEBUG && console.log(`  [${((Date.now() - T0) / 1000).toFixed(1)}s]`, ...m)
@@ -125,17 +135,30 @@ writeIndex()
 
 async function main() {
   const runs = PLAN.runs?.length
-    ? PLAN.runs.map((r) => ({ label: r.label, setup: r.setup, teardown: r.teardown, probes: r.probes ?? [], viewport: r.viewport, colorScheme: r.colorScheme, allow: r.allow, type: r.type, entries: r.entries ?? [], mode: r.mode ?? MODE, max: r.max ?? MAX, depth: r.depth ?? DEPTH, per: r.per ?? PER }))
+    ? PLAN.runs.map((r) => ({ label: r.label, skip: r.skip, setup: r.setup, teardown: r.teardown, probes: r.probes ?? [], viewport: r.viewport, colorScheme: r.colorScheme, allow: r.allow, type: r.type, entries: r.entries ?? [], mode: r.mode ?? MODE, max: r.max ?? MAX, depth: r.depth ?? DEPTH, per: r.per ?? PER }))
     : [{ label: LABEL, setup: SETUP, teardown: TEARDOWN, probes: [], allow: ALLOW, type: TYPE, colorScheme: SCHEME, entries: ENTRIES, mode: MODE, max: MAX, depth: DEPTH, per: PER, routes: ROUTES }]
   const t0 = Date.now()
+  const holder = `scan-${process.pid}`
+  const lockTool = join(toolsDir, 'lock.mjs')
+  const takeLock = (wait) => { try { execFileSync('node', [lockTool, 'take', LOCK, holder, '--wait', String(wait), '--stale', '120'], { stdio: 'pipe' }); return true } catch { return false } }
+  let beat
+  if (LOCK) {
+    console.log(`waiting for the lock ${LOCK}…`)
+    if (!takeLock(4 * 3600)) { console.log(`lock ${LOCK} not free; stopped`); process.exit(1) }
+    const release = () => { try { execFileSync('node', [lockTool, 'release', LOCK, holder], { stdio: 'pipe' }) } catch {} }
+    process.on('exit', release)
+    for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(130))
+    beat = setInterval(() => { if (!takeLock(1)) { console.log(`lock ${LOCK} was taken by someone else; stopping the scan`); process.exit(3) } }, 5 * 60 * 1000)
+    beat.unref()
+  }
   if (NATIVE) { await nativeScan(NATIVE); console.log(`done in ${Math.round((Date.now() - t0) / 1000)} s`); return }
   for (const run of runs) await crawl(run)
   if (REA) {
     const routes = await reaPass()
-    const concrete = routes.filter((r) => r.startsWith('/') && !/[$:{}*]/.test(r) && !SKIP.test(r))
+    const concrete = routes.filter((r) => r.startsWith('/') && r !== '/' && !/[$:{}*]/.test(r) && !SKIP.test(r) && !ROUTE_SKIP.test(r))
     if (VISIT_ROUTES && concrete.length) {
       writeFileSync(join(OUT, 'routes.txt'), concrete.join('\n') + '\n')
-      await crawl({ label: 'routes', setup: null, entries: concrete.map((r) => `route:${r}`), mode: 'safe', max: Math.max(MAX, concrete.length + 20), depth: 1, per: 12 })
+      await crawl({ label: 'routes', url: new URL(concrete[0], new URL(URL_).origin).href, setup: null, entries: concrete.map((r) => `route:${r}`), mode: 'safe', max: Math.max(MAX, concrete.length + 20), depth: 1, per: 12 })
     }
   }
   console.log(`done in ${Math.round((Date.now() - t0) / 1000)} s`)
@@ -229,6 +252,8 @@ async function reaPass() {
 
 async function crawl(run) {
   const { label, mode: MODE_, max: MAX_, depth: DEPTH_, per: PER_ } = run
+  // A run can start somewhere else than the plan's url (the routes run starts on a plain page, not the editor).
+  const START = run.url ?? URL_
   const RUN = join(OUT, 'runs', label)
   console.log(`\n── run ${label} ──`)
   if (!URL_) {
@@ -243,12 +268,12 @@ async function crawl(run) {
   }
   const browser = await chromium.connectOverCDP(ENDPOINT, { timeout: 20000 })
   const origin = new URL(URL_).origin
-  const startPath = new URL(URL_).pathname
+  const startPath = new URL(START).pathname
   let page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(origin) && new URL(p.url()).pathname === startPath)
   page ??= browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(origin))
   if (!page) {
     page = await browser.contexts()[0].newPage()
-    await page.goto(URL_)
+    await page.goto(START)
   }
   const context = page.context()
   const opened = []
@@ -266,6 +291,8 @@ async function crawl(run) {
   await page.emulateMedia({ colorScheme: run.colorScheme ?? SCHEME ?? null }).catch(() => {})
   const allowRe = run.allow ? new RegExp(run.allow, 'i') : null
   const typeText = run.type ?? TYPE
+  // A run's own skip list (things another run of the plan already covers) on top of the shared one.
+  const runSkip = run.skip?.length ? new RegExp(run.skip.join('|'), 'i') : null
   const COLLECT = readFileSync(join(toolsDir, 'scan-collect.js'), 'utf8')
   const setupCode = run.setup ? readFileSync(abs(run.setup), 'utf8') : null
 
@@ -277,6 +304,7 @@ async function crawl(run) {
   const t0 = Date.now()
 
   const collect = async () => {
+    if (page.isClosed()) throw new Error('the scan tab was closed')
     for (let i = 0; i < 3; i++) {
       try {
         if (!(await page.evaluate(() => typeof window.__scanCollect === 'function'))) await page.evaluate(COLLECT)
@@ -296,6 +324,16 @@ async function crawl(run) {
     return createHash('sha1').update('+' + [...keysOf(snap)].filter((k) => !pk.has(k)).sort().join('\n')).digest('hex').slice(0, 10)
   }
   const byAdded = new Map()
+  // The same screen as a state: identical, or (apps that vary a menu item or two between loads) the same page with
+  // at least 90% of the same controls.
+  const sameAs = (snap, state) => {
+    if (fpOf(snap) === state.fp) return true
+    if (new URL(snap.url).pathname !== new URL(state.url).pathname) return false
+    const a = keysOf(snap)
+    const b = keysOf(state.snap)
+    const both = [...a].filter((k) => b.has(k)).length
+    return both / (a.size + b.size - both || 1) >= 0.9
+  }
   const fpOf = (snap) => createHash('sha1').update(new URL(snap.url).pathname + '\n' + [...keysOf(snap)].sort().join('\n')).digest('hex').slice(0, 10)
   const settle = async (ms = WAIT) => { await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {}); await sleep(ms) }
   const runSetup = async () => { if (setupCode) await page.evaluate(`(async () => {\n${setupCode}\n})()`).catch((e) => console.log(`  setup failed: ${String(e.message).split('\n')[0]}`)) }
@@ -340,13 +378,37 @@ async function crawl(run) {
   const describe = (a) =>
     a.kind === 'key' ? `key ${a.key}` : a.kind === 'route' ? `go to ${a.route}` : a.kind === 'type' ? `type "${short(a.text, 20)}"` : a.kind === 'search' ? `search "${a.text}" in ${a.role} "${short(a.name, 30)}"` : a.kind === 'wait' ? `wait ${a.ms} ms` : a.kind === 'drag' ? `drag ${a.x},${a.y} → ${a.x2},${a.y2}` : a.kind === 'dblclick' ? `double-click ${a.x},${a.y}` : `${{ click: 'click', right: 'right-click', hover: 'hover' }[a.kind]} ${a.role ? `${a.role} "${short(a.name, 40)}"` : a.selector ?? `${a.x},${a.y}`}`
 
+  // Back to a state without reloading when possible: Escape until the start screen shows, then replay the path.
+  const softRestore = async (path) => {
+    if (!states.length || page.isClosed()) return false
+    for (let i = 0; i < 5; i++) {
+      // Last try: the setup script also resets UI the app remembers (an open side panel, a mode).
+      if (i === 4) { await runSetup(); await settle() }
+      const snap = await collect().catch(() => null)
+      if (snap && sameAs(snap, states[0])) {
+        for (const a of path) await doAction(a)
+        return true
+      }
+      if (snap && new URL(snap.url).pathname !== new URL(states[0].url).pathname) return false
+      await page.keyboard.press('Escape')
+      await settle()
+    }
+    return false
+  }
   const restore = async (path) => {
     dbg('restore', path.length, 'steps')
+    if (await softRestore(path)) return
     // A reload of the same page is safer than navigating to it again (heavy apps such as Figma can stall on a goto).
-    const samePage = (() => { try { return new URL(page.url()).pathname === new URL(URL_).pathname } catch { return false } })()
-    await (samePage ? page.reload({ timeout: 90000, waitUntil: 'domcontentloaded' }) : page.goto(URL_, { timeout: 90000, waitUntil: 'domcontentloaded' })).catch((e) => console.log(`  reload: ${String(e.message).split('\n')[0]}`))
+    if (page.isClosed()) { page = await context.newPage(); page.on('dialog', (d) => (d.type() === 'beforeunload' ? d.accept() : d.dismiss()).catch(() => {})); console.log('  the scan tab was closed; continuing in a new tab') }
+    const samePage = (() => { try { return new URL(page.url()).pathname === new URL(START).pathname } catch { return false } })()
+    await (samePage ? page.reload({ timeout: 90000, waitUntil: 'domcontentloaded' }) : page.goto(START, { timeout: 90000, waitUntil: 'domcontentloaded' })).catch((e) => console.log(`  reload: ${String(e.message).split('\n')[0]}`))
     await page.bringToFront().catch(() => {})
-    if (READY) await page.waitForFunction(READY, null, { timeout: 90000, polling: 500 }).catch(() => console.log('  ready check timed out'))
+    // A heavy app can stall on its loading screen: reload again (up to three tries) until it is ready.
+    for (let tries = 0; READY && tries < 3; tries++) {
+      if (await page.waitForFunction(READY, null, { timeout: 60000, polling: 500 }).then(() => true, () => false)) break
+      console.log('  not ready after loading; reloading again')
+      await page.reload({ timeout: 90000, waitUntil: 'domcontentloaded' }).catch(() => {})
+    }
     await settle(READY ? WAIT * 3 : LOAD)
     await runSetup()
     await settle()
@@ -358,17 +420,18 @@ async function crawl(run) {
     await page.evaluate(() => { const el = document.activeElement; if (el && 'value' in el && el.value) { const set = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value')?.set; set?.call(el, ''); el.dispatchEvent(new Event('input', { bubbles: true })) } }).catch(() => {})
     for (let i = 0; i < 3; i++) {
       const snap = await collect().catch(() => null)
-      if (snap && fpOf(snap) === state.fp) return true
+      if (snap && sameAs(snap, state)) return true
       if (snap && new URL(snap.url).pathname !== new URL(state.url).pathname) await page.goBack({ waitUntil: 'commit', timeout: 5000 }).catch(() => {})
       else await page.keyboard.press('Escape')
       await settle()
     }
     await restore(state.path)
     const snap = await collect().catch(() => null)
-    if (snap && fpOf(snap) === state.fp) return true
+    if (snap && sameAs(snap, state)) return true
     if (snap) {
       const a = keysOf(snap)
       const b = keysOf(state.snap)
+      if (state.parent == null) console.log('  hint: the app remembers something between loads (an open panel, the current page or document, a mode); reset it in --setup')
       console.log(`  ${state.id} looks different after going back: missing ${[...b].filter((k) => !a.has(k)).slice(0, 4).join(', ') || '-'}; extra ${[...a].filter((k) => !b.has(k)).slice(0, 4).join(', ') || '-'}`)
     }
     return false
@@ -394,7 +457,7 @@ async function crawl(run) {
     for (const c of snap.controls) {
       if (out.length >= PER_) break
       if (!c.name && c.role !== 'combobox') continue
-      if (SKIP.test(c.name) || c.state?.disabled) continue
+      if (SKIP.test(c.name) || runSkip?.test(c.name) || c.state?.disabled) continue
       if (typeText && ['searchbox', 'textbox', 'combobox'].includes(c.role) && (c.role === 'searchbox' || /search|find|filter/i.test(c.name))) {
         if (searched.has(c.name) || c.state?.value) continue
         searched.add(c.name)
@@ -505,7 +568,7 @@ async function crawl(run) {
       const fp0 = fpOf(snap)
       let n = 0
       for (const c of list) {
-        if (n >= 150 || c.scrolled || c.w > 400 || c.h > 72 || !['button', 'tab', 'checkbox', 'radio', 'link', 'clickable', 'combobox', 'switch', 'treeitem'].includes(c.role)) continue
+        if (n >= 150 || c.scrolled || SKIP.test(c.name) || c.w > 400 || c.h > 72 || !['button', 'tab', 'checkbox', 'radio', 'link', 'clickable', 'combobox', 'switch', 'treeitem'].includes(c.role)) continue
         n++
         const cx = c.x + c.w / 2
         const cy = c.y + c.h / 2
@@ -527,7 +590,8 @@ async function crawl(run) {
           const near1 = await page.evaluate((b) => window.__scanNear?.(b) ?? [], { x: c.x, y: c.y, w: c.w, h: c.h }).catch(() => [])
           tip = [...new Set(near1.filter((t) => !near0.includes(t)))].join(' | ').slice(0, 160)
         }
-        if (tip && tip !== c.name) c.tip = tip
+        // A real tooltip is short; longer text is a preview card (it can hold the user's own content): not kept.
+        if (tip && tip !== c.name && tip.length <= 80) c.tip = tip
       }
       await page.mouse.move(snap.viewport[0] - 2, snap.viewport[1] - 2)
       await sleep(150)
@@ -563,6 +627,12 @@ async function crawl(run) {
     const parentKeys = state.parent != null ? keysOf(states[Number(state.parent)].snap) : new Set()
     const stateKeys = keysOf(state.snap)
     let first = true
+    // Rows of one list open look-alike states: keep the first few of each structure.
+    const shapes = new Map()
+    const shapeOf = (snap) => {
+      const pk = keysOf(state.snap)
+      return [...keysOf(snap)].filter((k) => !pk.has(k)).map((k) => k.replace(/\|.*$/, '|').replace(/\].*$/, ']')).sort().join(',')
+    }
     // A page tries every control; a change of its parent (menu, submenu, dialog, tab) only what it added, since the
     // parent's own controls are tried from the parent.
     const own = state.kind === 'page' || state.parent == null ? state.snap : { ...state.snap, controls: state.snap.controls.filter((c) => !parentKeys.has(`${c.role}|${c.name}`)) }
@@ -576,7 +646,7 @@ async function crawl(run) {
         const curKeys = keysOf(cur)
         // Exactly this state, or (hovering from one menu item to the next) this state plus a submenu still open.
         const visible = cur.controls.some((x) => x.role === c.role && x.name === c.name && Math.abs(x.x + x.w / 2 - c.x) < 6 && Math.abs(x.y + x.h / 2 - c.y) < 6)
-        const ready = fpOf(cur) === state.fp || (c.kind === 'hover' && visible && [...stateKeys].every((k) => curKeys.has(k)) && [...curKeys].filter((k) => !stateKeys.has(k)).every((k) => k.startsWith('menuitem') || k.startsWith('[menu]')))
+        const ready = sameAs(cur, state) || (c.kind === 'hover' && visible && [...stateKeys].every((k) => curKeys.has(k)) && [...curKeys].filter((k) => !stateKeys.has(k)).every((k) => k.startsWith('menuitem') || k.startsWith('[menu]')))
         if (!ready && !(await goBackTo(state))) { console.log(`  could not return to ${state.id}; skipping the rest of it`); return }
         await doAction(c)
         const snap = await collect()
@@ -590,6 +660,9 @@ async function crawl(run) {
         // Nothing new on screen (a highlight, a closed submenu): not a state of its own.
         if (!navigatedNow && ![...keysOf(snap)].some((k) => !stateKeys.has(k))) continue
         const known = byFp.get(fp) ?? (aFp && byAdded.get(aFp))
+        const shape = !known && !navigatedNow && c.kind === 'click' && !c.popup && ['button', 'treeitem', 'clickable'].includes(c.role) ? shapeOf(snap) : null
+        if (shape && (shapes.get(shape) ?? 0) >= SAME) { edges.push({ from: state.id, action: describe(c), to: `like ${shape.slice(0, 40)} (not opened: ${SAME} similar states kept)` }); continue }
+        if (shape) shapes.set(shape, (shapes.get(shape) ?? 0) + 1)
         if (known) edges.push({ from: state.id, action: describe(c), to: known.id })
         else {
           const child = await record(snap, state, c)
