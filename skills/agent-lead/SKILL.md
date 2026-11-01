@@ -1,5 +1,6 @@
 ---
 name: agent-lead
+user-invocable: false
 description: Lead a project with another coding agent as the worker (agy, Codex, Gemini CLI, Qwen Code, OpenCode, Cursor Agent, a second Claude Code, Aider, or any other agent) while you plan, keep the checklist, write briefs, review, and commit. Two workflows - Pane (you launch the worker CLI and the user watches it live in the /agent pane) and Handoff (the user pastes your prompt into a worker session they run themselves, for example in emdash, another terminal or an IDE). Use when the user runs /lead, says "you are the lead/boss", "have codex build X and you review", "give the task to the worker", "report ready", or wants to set up or resume this workflow in any project. Not for work small enough to do inline.
 ---
 
@@ -42,8 +43,9 @@ Files in this skill (read the one you need, when you need it):
 - **Every project ends up with the six docs** (PRD, TRD, UI/UX design, app flow, backend schema, implementation plan).
   The implementation plan is the checklist. Do not start feature work on a project without them; for an existing
   project, write them from the code and the user's answers (`foundation.md`), then continue.
-- `/lead pane` or `/lead handoff` picks the workflow without asking (and switches an existing project's workflow;
-  record the change in LEAD.md). Any other words after `/lead` are the user's goal for this session.
+- `/lead` is the only command. It always asks the user first which workflow to use this session (Handoff or Pane,
+  the current one first). A choice that differs from LEAD.md switches the project's workflow; record the change in
+  LEAD.md. Any words after `/lead` are the user's goal for this session.
 
 ## 2. The loop for one item (both workflows)
 

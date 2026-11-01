@@ -25,7 +25,8 @@ Run these yourself; do not ask the user what you can find out.
 
 ## 2. Ask the user (one AskUserQuestion with up to four questions; plain chat when the tool is missing)
 
-Skip any question the `/lead` arguments or the project already answer.
+Skip any question the project already answers. `/lead` asks the workflow before anything else, so skip question 1
+when it ran; ask it only when the skill was started without `/lead`.
 
 1. **Workflow** — options:
    - "Handoff (you paste prompts into the worker)" — the user runs the worker in their own tool (emdash, another

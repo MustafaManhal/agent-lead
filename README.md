@@ -30,10 +30,12 @@ In any project, run:
 /lead
 ```
 
-or `/lead handoff`, `/lead pane`, `/lead handoff build the settings screen`. The first time, the lead:
+or `/lead build the settings screen` (words after `/lead` are your goal for the session). `/lead` is the only
+command. Every time you run it, it first asks which workflow style you want: Handoff or Pane (your current one is
+listed first). The first time, the lead then:
 
 1. Looks around the project (git, stack, commands, existing docs and checklists).
-2. Asks you a few questions at once: the workflow, the worker, what to do about missing docs, where the worker works.
+2. Asks you a few questions at once: the worker, what to do about missing docs, where the worker works.
 3. For a new project (or one without docs), runs the **foundation**: intake questions, research on competitors,
    references and technology (with Playwright screenshots), decisions, then the **six docs**. You approve them.
 4. Writes `.agent-lead/`: `LEAD.md` (this project's playbook and current state), `WORKER.md` (the worker's rules),
@@ -41,7 +43,8 @@ or `/lead handoff`, `/lead pane`, `/lead handoff build the settings screen`. The
 5. Starts milestone M0 (the foundation: tooling, design tokens, checks, a screenshot helper), then works the plan
    item by item.
 
-Every later session: run `/lead` again. The lead reads `LEAD.md` and continues where the last one stopped.
+Every later session: run `/lead` again. Pick the workflow (keep the current one or switch); the lead reads
+`LEAD.md` and continues where the last one stopped.
 
 ## The loop for each item
 
@@ -59,8 +62,8 @@ Every later session: run `/lead` again. The lead reads `LEAD.md` and continues w
 
 | Part | What it does |
 | --- | --- |
-| `/lead` command | Starts or resumes the lead workflow in the current project. |
-| `agent-lead` skill | `SKILL.md` (the procedure) plus `project-setup.md`, `foundation.md`, `research.md`, `playwright.md`, `review.md`, `workflows/handoff.md`, `workflows/pane.md` and `clis.md`. |
+| `/lead` command | The only command. Asks which workflow (Handoff or Pane), then starts or resumes the lead workflow in the current project. |
+| `agent-lead` skill | Started by `/lead` (hidden from the slash menu). `SKILL.md` (the procedure) plus `project-setup.md`, `foundation.md`, `research.md`, `playwright.md`, `review.md`, `workflows/handoff.md`, `workflows/pane.md` and `clis.md`. |
 | Templates | The six docs, `LEAD.md`, `WORKER.md`, `brief.md`, `review-round.md`, `status.md`, `decisions.md`, an `AGENTS.md` pointer section, allow lists. |
 | Checklist page | Every project gets one (you are asked once): the plan as a page with overall progress, the next item, milestone cards that fold away when done, Details for long notes, Expand all / Collapse all / Hide done, light and dark, phone-friendly. Published privately with the Artifact tool to one link that stays the same, or kept as a local file. Rebuilt after every checklist change. Built by `plan-page.mjs`. |
 | `/agent` pane | Live view of a Pane-mode run: each file read or written, each command with its exit code, refused commands in red, the reply, time and tokens. Opens by itself; `/agent close` hides it. `/agy` still works. |
