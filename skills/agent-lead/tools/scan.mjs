@@ -130,6 +130,9 @@ const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const json = (v) => JSON.stringify(v, null, 1)
 
+// Tooltips and hover looks already recorded in this scan (the same toolbar shows in every run).
+const hoverSeen = new Map()
+
 if (!indexOnly) await main()
 writeIndex()
 
@@ -335,7 +338,16 @@ async function crawl(run) {
     return both / (a.size + b.size - both || 1) >= 0.9
   }
   const fpOf = (snap) => createHash('sha1').update(new URL(snap.url).pathname + '\n' + [...keysOf(snap)].sort().join('\n')).digest('hex').slice(0, 10)
-  const settle = async (ms = WAIT) => { await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {}); await sleep(ms) }
+  // Wait until the page stops changing, at most `ms` (the old fixed wait); without the helper (a new page), sleep.
+  let lastUrl = ''
+  const settle = async (ms = WAIT) => {
+    // A load check only after the address changed (on an unchanged page it can wait for its full timeout).
+    const url = page.url()
+    if (url !== lastUrl) { lastUrl = url; await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {}) }
+    if (ms <= 0) return
+    const waited = await page.evaluate(([q, m]) => (window.__scanQuiet ? window.__scanQuiet(q, m) : null), [120, ms]).catch(() => null)
+    if (waited == null) await sleep(ms)
+  }
   const runSetup = async () => { if (setupCode) await page.evaluate(`(async () => {\n${setupCode}\n})()`).catch((e) => console.log(`  setup failed: ${String(e.message).split('\n')[0]}`)) }
 
   const doAction = async (a) => {
@@ -568,23 +580,36 @@ async function crawl(run) {
       const fp0 = fpOf(snap)
       let n = 0
       for (const c of list) {
+        const hk = `${c.role}|${c.name}|${c.x}|${c.y}`
+        const seen = hoverSeen.get(hk)
+        if (seen) { if (seen.tip) c.tip = seen.tip; if (seen.hover) c.hover = seen.hover; continue }
+        // Plain controls that look the same (rows of a list) hover the same: check one, reuse it for the rest.
+        const lk = !c.look?.icon ? `${c.role}|${JSON.stringify(c.look)}|${c.w}x${c.h}` : null
+        if (lk && hoverSeen.has(lk)) { const h = hoverSeen.get(lk); if (h.hover) c.hover = h.hover; continue }
         if (n >= 150 || c.scrolled || SKIP.test(c.name) || c.w > 400 || c.h > 72 || !['button', 'tab', 'checkbox', 'radio', 'link', 'clickable', 'combobox', 'switch', 'treeitem'].includes(c.role)) continue
         n++
         const cx = c.x + c.w / 2
         const cy = c.y + c.h / 2
         await page.mouse.move(snap.viewport[0] - 2, snap.viewport[1] - 2)
-        await sleep(120)
+        await sleep(60)
         const rest = await page.evaluate(([x, y]) => window.__scanLookAt?.(x, y), [cx, cy]).catch(() => null)
         const near0 = c.look?.icon ? await page.evaluate((b) => window.__scanNear?.(b) ?? [], { x: c.x, y: c.y, w: c.w, h: c.h }).catch(() => []) : []
         await page.mouse.move(cx, cy)
-        await sleep(c.look?.icon ? TIP : 200)
+        // Tooltips: poll and stop as soon as one shows (at most TIP ms); other controls only need the hover color.
+        const box = { x: c.x, y: c.y, w: c.w, h: c.h }
+        if (c.look?.icon) {
+          for (let t = 0; t < TIP; t += 100) {
+            await sleep(100)
+            if (await page.evaluate((b) => !!window.__scanTooltip?.(b), box).catch(() => false)) break
+          }
+        } else await sleep(150)
         // Hover look: only what changes on hover.
         const hov = await page.evaluate(([x, y]) => window.__scanLookAt?.(x, y), [cx, cy]).catch(() => null)
         if (rest && hov) {
           const d = Object.fromEntries(Object.entries(hov).filter(([k, v]) => rest[k] !== v))
           if (Object.keys(d).length) c.hover = d
         }
-        if (!c.look?.icon) continue
+        if (!c.look?.icon) { hoverSeen.set(hk, { hover: c.hover }); if (lk) hoverSeen.set(lk, { hover: c.hover }); continue }
         let tip = await page.evaluate((b) => window.__scanTooltip?.(b) ?? '', { x: c.x, y: c.y, w: c.w, h: c.h }).catch(() => '')
         if (!tip) {
           const near1 = await page.evaluate((b) => window.__scanNear?.(b) ?? [], { x: c.x, y: c.y, w: c.w, h: c.h }).catch(() => [])
@@ -592,6 +617,8 @@ async function crawl(run) {
         }
         // A real tooltip is short; longer text is a preview card (it can hold the user's own content): not kept.
         if (tip && tip !== c.name && tip.length <= 80) c.tip = tip
+        hoverSeen.set(hk, { tip: c.tip, hover: c.hover })
+        if (lk) hoverSeen.set(lk, { hover: c.hover })
       }
       await page.mouse.move(snap.viewport[0] - 2, snap.viewport[1] - 2)
       await sleep(150)

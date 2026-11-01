@@ -18,6 +18,18 @@ window.__scanNear = (box) => {
   }
   return out
 }
+// Resolves once the page has not changed for `quiet` ms (or after `max` ms): waits only as long as the app needs.
+window.__scanQuiet = (quiet = 120, max = 450) => new Promise((resolve) => {
+  const start = performance.now()
+  let last = start
+  const mo = new MutationObserver(() => { last = performance.now() })
+  mo.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true })
+  const tick = () => {
+    const now = performance.now()
+    if (now - last >= quiet || now - start >= max) { mo.disconnect(); resolve(Math.round(now - start)) } else setTimeout(tick, 30)
+  }
+  setTimeout(tick, 30)
+})
 window.__scanTooltip = (box) => {
   const out = []
   for (const el of document.querySelectorAll('[role="tooltip"], [class*="tooltip" i], [data-tooltip-content]')) {
