@@ -13,10 +13,11 @@
 // Claude Code's "rea" server config) for every route and API endpoint in the app's JavaScript; concrete routes are
 // visited in an extra "routes" run. The agent reads the result and needs no screenshots or measuring of its own.
 //
-// Plan file: { "url", "out", "viewport", "ready", "skip": [], "rea": true, "runs": [ { "label", "setup", "teardown",
-//   "entries", "skip": [], "mode", "max", "depth", "per", "viewport", "colorScheme", "allow", "type", "probes": [ { "name",
+// Plan file: { "url", "out", "viewport", "ready", "skip": [], "rea": true, "lock", "undo", "tip", "runs": [ { "label", "setup", "teardown",
+//   "ready", "undo", "tip", "entries", "skip": [], "mode", "max", "depth", "per", "viewport", "colorScheme", "allow", "type", "probes": [ { "name",
 //   "steps": ["key:r", "drag:600,300,800,420", "dblclick:700,360", "type:Hello", "wait:300", "click:x,y"] } ] } ] }
-//   (paths relative to the project root; each run starts from the url). Probes are for what has no control to click:
+//   (paths relative to the project root; each run starts from the url. ready, undo and tip may be set per run).
+//   Probes are for what has no control to click:
 //   drawing on a canvas, dragging handles, double-clicking, typing; every step is captured.
 //
 // Options (defaults from "reference" and "scan" in .agent-lead/config.json):
@@ -162,7 +163,7 @@ writeIndex()
 
 async function main() {
   const runs = PLAN.runs?.length
-    ? PLAN.runs.map((r) => ({ label: r.label, skip: r.skip, setup: r.setup, teardown: r.teardown, probes: r.probes ?? [], viewport: r.viewport, colorScheme: r.colorScheme, allow: r.allow, type: r.type, entries: r.entries ?? [], mode: r.mode ?? MODE, max: r.max ?? MAX, depth: r.depth ?? DEPTH, per: r.per ?? PER }))
+    ? PLAN.runs.map((r) => ({ label: r.label, skip: r.skip, setup: r.setup, teardown: r.teardown, probes: r.probes ?? [], viewport: r.viewport, colorScheme: r.colorScheme, allow: r.allow, type: r.type, ...('ready' in r ? { ready: r.ready } : {}), undo: r.undo, tip: r.tip, entries: r.entries ?? [], mode: r.mode ?? MODE, max: r.max ?? MAX, depth: r.depth ?? DEPTH, per: r.per ?? PER }))
     : [{ label: LABEL, setup: SETUP, teardown: TEARDOWN, probes: [], allow: ALLOW, type: TYPE, colorScheme: SCHEME, entries: ENTRIES, mode: MODE, max: MAX, depth: DEPTH, per: PER, routes: ROUTES }]
   const t0 = Date.now()
   const holder = `scan-${process.pid}`
@@ -184,7 +185,15 @@ async function main() {
   if (NATIVE) { await nativeScan(NATIVE); console.log(`done in ${Math.round((Date.now() - t0) / 1000)} s`); return }
   if (PARALLEL && runs.length > 1) {
     console.log(`running ${runs.length} runs at the same time, one window each`)
-    await Promise.all(runs.map((run) => crawl({ ...run, ownWindow: true })))
+    const results = await Promise.allSettled(runs.map((run) => crawl({ ...run, ownWindow: true })))
+    let failed = 0
+    results.forEach((result, i) => {
+      if (result.status === 'rejected') {
+        failed++
+        console.log(`run ${runs[i].label} failed: ${String(result.reason?.message ?? result.reason).split('\n')[0]}`)
+      }
+    })
+    if (failed) process.exitCode = 1
   } else for (const run of runs) await crawl(run)
   if (REA) {
     const routes = await reaPass()
@@ -296,6 +305,8 @@ async function crawl(run) {
   const START = run.url ?? URL_
   // The ready check belongs to the start page (an editor's API); a run that starts elsewhere (routes) has its own.
   const RDY = 'ready' in run ? run.ready : READY
+  const RUN_UNDO = run.undo ?? UNDO
+  const RUN_TIP = Number(run.tip ?? TIP)
   const RUN = join(OUT, 'runs', label)
   console.log(`\n── run ${label} ──`)
   if (!URL_) {
@@ -653,8 +664,8 @@ async function crawl(run) {
       dbg('reselect', want.role, want.name)
       await doAction({ kind: 'click', role: now.role, name: now.name, x: Math.round(now.x + now.w / 2), y: Math.round(now.y + now.h / 2) }).catch(() => {})
     }
-    for (let i = 0; UNDO && changedDoc > 0 && i < 3 && !page.isClosed(); i++) {
-      await page.keyboard.press(UNDO).catch(() => {})
+    for (let i = 0; RUN_UNDO && changedDoc > 0 && i < 3 && !page.isClosed(); i++) {
+      await page.keyboard.press(RUN_UNDO).catch(() => {})
       changedDoc--
       await settle()
       const cur = await collect(true).catch(() => null)
@@ -798,7 +809,7 @@ async function crawl(run) {
         // Tooltips: poll and stop as soon as one shows (at most TIP ms); other controls only need the hover color.
         const box = { x: c.x, y: c.y, w: c.w, h: c.h }
         if (c.look?.icon) {
-          for (let t = 0; t < TIP; t += 100) {
+          for (let t = 0; t < RUN_TIP; t += 100) {
             await sleep(100)
             if (await page.evaluate((b) => !!window.__scanTooltip?.(b), box).catch(() => false)) break
           }

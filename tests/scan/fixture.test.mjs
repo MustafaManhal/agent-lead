@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -23,6 +23,7 @@ body{font:15px sans-serif;margin:24px;color:#222}button,a,input{margin:5px;paddi
 <a href="/second">Second page</a>
 <span class="icon-wrap"><button aria-label="Help"><svg class="icon"><title>Question mark</title><circle cx="12" cy="12" r="8"/></svg></button><span class="tip" role="tooltip">Help tooltip</span></span>
 <button id="delete">Delete</button><script>
+window.fixtureReady = true;
 const file=document.getElementById('file'),menu=document.getElementById('menu'),more=document.getElementById('more'),sub=document.getElementById('submenu');file.onclick=()=>{menu.classList.toggle('open');file.setAttribute('aria-expanded',menu.classList.contains('open'))};more.onmouseenter=()=>sub.classList.add('open');
 for(const t of document.querySelectorAll('[role=tab]'))t.onclick=()=>{for(const x of document.querySelectorAll('[role=tab]'))x.setAttribute('aria-selected',String(x===t));document.getElementById('panel').textContent=t.textContent+' panel'};
 document.getElementById('details').onclick=()=>document.getElementById('dialog').showModal();document.getElementById('dialog').onkeydown=e=>{if(e.key==='Escape')document.getElementById('dialog').close()};
@@ -83,6 +84,56 @@ test('scan crawls local fixture safely and recognizes start screen after volatil
     assert.ok(graph.edges.some((e) => e.action.includes('Back to start') && e.to === '000'), 'reloaded start screen with a new zoom number should match the original state')
     assert.equal(deletes, 0, 'Delete button must never be activated')
     assert.doesNotMatch(stdout, /could not return to 000/)
+  } finally {
+    await browser?.close().catch(() => {})
+    await new Promise((resolve) => server.close(resolve))
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('parallel scan keeps successful output when a sibling run fails and closes its windows', { timeout: 55_000 }, async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'agent-lead-scan-parallel-'))
+  let loads = 0
+  const server = createServer((req, res) => {
+    if (req.url !== '/' && req.url !== '/favicon.ico') { res.writeHead(404); res.end(); return }
+    loads++
+    res.writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' })
+    res.end(fixture.replaceAll('__ZOOM__', String(loads * 10)))
+  })
+  await new Promise((resolve) => server.listen(9556, '127.0.0.1', resolve))
+  let browser
+  try {
+    browser = await chromium.launch({ headless: true, args: ['--remote-debugging-port=9555', '--remote-allow-origins=*'] })
+    const page = await browser.newPage()
+    await page.goto('http://127.0.0.1:9556/')
+    const out = join(dir, 'out')
+    const plan = join(dir, 'plan.json')
+    await writeFile(plan, JSON.stringify({
+      url: 'http://127.0.0.1:9556/', out, parallel: true, rea: false, ready: 'false',
+      runs: [
+        { label: 'broken', setup: join(dir, 'missing-setup.js'), max: 1, depth: 0, per: 5, ready: 'window.fixtureReady === true', undo: 'Meta+z', tip: 0 },
+        { label: 'good', max: 12, depth: 1, per: 10, ready: 'window.fixtureReady === true', undo: 'Meta+z', tip: 0 },
+      ],
+    }))
+    const env = { ...process.env, NODE_PATH: dirname(dirname(playwrightRequire.resolve('playwright'))) }
+    const child = spawn(process.execPath, [join(repo, 'skills/agent-lead/tools/scan.mjs'), '--plan', plan, '--port', '9555', '--no-rea', '--no-routes', '--wait', '50', '--load', '250', '--tip', '0', '--no-motion', '--no-icons', '--no-tooltips'], { cwd: repo, env, stdio: ['ignore', 'pipe', 'pipe'] })
+    let stdout = '', stderr = ''
+    child.stdout.on('data', (d) => { stdout += d })
+    child.stderr.on('data', (d) => { stderr += d })
+    const code = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('parallel scan exceeded 45 seconds')) }, 45_000)
+      child.on('error', (e) => { clearTimeout(timer); reject(e) })
+      child.on('exit', (status) => { clearTimeout(timer); resolve(status) })
+    })
+    assert.equal(code, 1, `${stdout}\n${stderr}`)
+    assert.match(stdout, /run broken failed:.*missing-setup\.js/)
+    const goodGraph = JSON.parse(await readFile(join(out, 'runs/good/graph.json'), 'utf8'))
+    assert.ok(goodGraph.states.length > 0, 'successful sibling should retain its graph')
+    await assert.rejects(readFile(join(out, 'runs/broken/graph.json'), 'utf8'))
+    assert.ok((await readFile(join(out, 'INDEX.md'), 'utf8')).includes('good/000'))
+    assert.equal(browser.contexts().flatMap((c) => c.pages()).filter((p) => !p.isClosed()).length, 1, 'only the fixture tab should remain open')
+    assert.ok(loads >= 1)
+    void page
   } finally {
     await browser?.close().catch(() => {})
     await new Promise((resolve) => server.close(resolve))

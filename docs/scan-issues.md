@@ -23,6 +23,9 @@ Evidence: the Figma runs of 2026-11-01 (logs in figmu `figma-research/scan/*.log
 | 18 | Clicked "Spotlight me" | a collaboration action other people see was not on the never-click list | spotlight, follow, observe and present-to added to the built-in list | fixed 0.10.4 |
 | 19 | INDEX.md 38 KB (~10k tokens) | the full state table lived in the index | short INDEX (overview, counts, main screens); full table in states.md | fixed 0.10.4 |
 | 20 | Few tooltips (26) | the app shows tooltips later than the hover time | plans can set tip (Figma: 1200 ms) | fixed 0.10.4 |
+| 21 | Pending MCP calls waited for timeout after server exit | child exit did not settle outstanding requests | reject all pending and later calls on exit/error | fixed in scan hardening |
+| 22 | Native scan could crash on an unexpected accessibility value | position, size and menu-bar values used force casts | check Core Foundation type IDs, then convert valid values | fixed in scan hardening |
+| 23 | Parallel scan stopped at first rejected run | `Promise.all` abandoned sibling results and skipped partial indexing | settle all runs, log each failure, preserve successful output and close run windows | fixed in scan hardening |
 | 13 | Slow on heavy pages | fixed waits, full style reads for every check | quick checks, adaptive waits, direct screenshots | fixed 0.9.0 |
 
 Test after the open fixes: the fixture page (all states, under 40 s) with volatile names and a remembered panel added to

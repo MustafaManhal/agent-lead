@@ -29,10 +29,12 @@ func str(_ el: AXUIElement, _ name: String) -> String? {
 }
 func frame(_ el: AXUIElement) -> CGRect? {
   guard let p = attr(el, kAXPositionAttribute), let s = attr(el, kAXSizeAttribute) else { return nil }
+  guard CFGetTypeID(p) == AXValueGetTypeID(), CFGetTypeID(s) == AXValueGetTypeID() else { return nil }
+  let position = unsafeBitCast(p, to: AXValue.self)
+  let size = unsafeBitCast(s, to: AXValue.self)
   var pt = CGPoint.zero
   var sz = CGSize.zero
-  AXValueGetValue(p as! AXValue, .cgPoint, &pt)
-  AXValueGetValue(s as! AXValue, .cgSize, &sz)
+  guard AXValueGetValue(position, .cgPoint, &pt), AXValueGetValue(size, .cgSize, &sz) else { return nil }
   return CGRect(origin: pt, size: sz)
 }
 
@@ -58,4 +60,7 @@ let app = AXUIElementCreateApplication(pid)
 let windows = (attr(app, kAXWindowsAttribute) as? [AXUIElement]) ?? []
 for (i, w) in windows.enumerated() { emit(w, window: i, title: str(w, kAXTitleAttribute) ?? "", depth: 0) }
 // The menu bar is part of a desktop app's features too.
-if let bar = attr(app, kAXMenuBarAttribute) { emit(bar as! AXUIElement, window: -1, title: "menu bar", depth: 0) }
+if let bar = attr(app, kAXMenuBarAttribute), CFGetTypeID(bar) == AXUIElementGetTypeID() {
+  let menuBar = unsafeBitCast(bar, to: AXUIElement.self)
+  emit(menuBar, window: -1, title: "menu bar", depth: 0)
+}

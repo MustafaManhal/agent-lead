@@ -25,6 +25,12 @@ export async function connect({ command, args = [], env = {} }, { timeout = 1200
   let buf = ''
   let next = 1
   const waiting = new Map()
+  let childFailure = null
+  const failWaiting = (error) => {
+    if (childFailure) return
+    childFailure = error
+    for (const pending of waiting.values()) pending.reject(error)
+  }
   child.stdout.on('data', (d) => {
     buf += d
     let i
@@ -35,16 +41,25 @@ export async function connect({ command, args = [], env = {} }, { timeout = 1200
       let msg
       try { msg = JSON.parse(line) } catch { continue }
       const w = msg.id != null && waiting.get(msg.id)
-      if (w) { waiting.delete(msg.id); msg.error ? w.reject(new Error(msg.error.message)) : w.resolve(msg.result) }
+      if (w) { msg.error ? w.reject(new Error(msg.error.message)) : w.resolve(msg.result) }
     }
   })
-  const exited = new Promise((r) => child.on('exit', r))
+  const exited = new Promise((resolve) => child.once('exit', (code, signal) => {
+    failWaiting(new Error(`MCP server exited before replying (code ${code ?? 'unknown'}${signal ? `, signal ${signal}` : ''})`))
+    resolve(code)
+  }))
+  child.once('error', (error) => failWaiting(new Error(`MCP server process failed: ${error.message}`)))
   const request = (method, params, ms = timeout) =>
     new Promise((resolve, reject) => {
+      if (childFailure) { reject(childFailure); return }
       const id = next++
-      const timer = setTimeout(() => { waiting.delete(id); reject(new Error(`${method}: no answer in ${ms} ms`)) }, ms)
-      waiting.set(id, { resolve: (v) => { clearTimeout(timer); resolve(v) }, reject: (e) => { clearTimeout(timer); reject(e) } })
-      child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n')
+      const timer = setTimeout(() => { waiting.get(id)?.reject(new Error(`${method}: no answer in ${ms} ms`)) }, ms)
+      waiting.set(id, {
+        resolve: (v) => { if (!waiting.delete(id)) return; clearTimeout(timer); resolve(v) },
+        reject: (e) => { if (!waiting.delete(id)) return; clearTimeout(timer); reject(e) },
+      })
+      try { child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n') }
+      catch (error) { waiting.get(id)?.reject(new Error(`MCP server request failed: ${error.message}`)) }
     })
   const close = async () => { child.stdin.end(); child.kill(); await Promise.race([exited, new Promise((r) => setTimeout(r, 2000))]) }
   try {
