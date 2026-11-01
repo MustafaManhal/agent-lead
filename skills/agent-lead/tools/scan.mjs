@@ -141,6 +141,13 @@ const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const json = (v) => JSON.stringify(v, null, 1)
 
+// Screen comparison (after Crawljax's comparators and near-duplicate detection, Yandrapally et al. ICSE 2020):
+// parts that change by themselves are stripped before comparing: numbers (zoom "100%", counts), hex colors, case
+// and spacing. A control's key is its role plus that normalized name.
+const norm = (name = '') => name.toLowerCase().replace(/#?[0-9a-f]{6}\b/g, '#hex').replace(/\d+([.,:]\d+)*/g, '#').replace(/\s+/g, ' ').trim()
+const ck = (c) => `${c.role}|${norm(c.name)}`
+const bk = (c) => `[${c.role}]${norm(c.name)}`
+
 // Tooltips and hover looks already recorded in this scan (the same toolbar shows in every run).
 const hoverSeen = new Map()
 // Pages the scan works in (one per run); other tabs the app opens are closed.
@@ -382,8 +389,8 @@ async function crawl(run) {
   }
   const keysOf = (snap) =>
     new Set([
-      ...snap.controls.filter((c) => !['textbox', 'searchbox', 'spinbutton', 'slider'].includes(c.role)).map((c) => `${c.role}|${c.name}`),
-      ...snap.containers.filter((c) => c.role !== 'tooltip').map((c) => `[${c.role}]${c.name}`),
+      ...snap.controls.filter((c) => !['textbox', 'searchbox', 'spinbutton', 'slider'].includes(c.role)).map(ck),
+      ...snap.containers.filter((c) => c.role !== 'tooltip').map(bk),
     ])
   // What a state adds to its parent: the same menu or dialog opened from another screen is the same thing.
   const addedFpOf = (snap, parentSnap) => {
@@ -393,13 +400,19 @@ async function crawl(run) {
   const byAdded = new Map()
   // The same screen as a state: identical, or (apps that vary a menu item or two between loads) the same page with
   // at least 90% of the same controls.
+  // The same screen as a state (near-duplicate, not only identical): same page, 80% of the controls the state itself
+  // added (a menu's items, a dialog's fields) back on screen, and 70% of everything alike; the start screen needs 80%
+  // of everything. Late-loading lists, an extra bar or a changed count no longer break the match.
   const sameAs = (snap, state) => {
     if (fpOf(snap) === state.fp) return true
     if (new URL(snap.url).pathname !== new URL(state.url).pathname) return false
     const a = keysOf(snap)
     const b = keysOf(state.snap)
-    const both = [...a].filter((k) => b.has(k)).length
-    return both / (a.size + b.size - both || 1) >= 0.9
+    const both = [...b].filter((k) => a.has(k)).length
+    const jaccard = both / (a.size + b.size - both || 1)
+    if (!state.ownKeys?.length) return jaccard >= 0.8
+    const own = state.ownKeys.filter((k) => a.has(k)).length / state.ownKeys.length
+    return own >= 0.8 && jaccard >= 0.7
   }
   const fpOf = (snap) => createHash('sha1').update(new URL(snap.url).pathname + '\n' + [...keysOf(snap)].sort().join('\n')).digest('hex').slice(0, 10)
   // Wait until the page stops changing, at most `ms` (the old fixed wait); without the helper (a new page), sleep.
@@ -663,17 +676,17 @@ async function crawl(run) {
       else if (MODE_ === 'wide' && ['button', 'clickable', 'treeitem'].includes(c.role)) out.push({ ...base, kind: 'click' })
     }
     // Controls new in this state first: they belong to what just opened.
-    return out.sort((a, b) => Number(parentKeys.has(`${a.role}|${a.name}`)) - Number(parentKeys.has(`${b.role}|${b.name}`)))
+    return out.sort((a, b) => Number(parentKeys.has(ck(a))) - Number(parentKeys.has(ck(b))))
   }
 
   const record = async (snap, parent, via) => {
     const fp = fpOf(snap)
     const id = String(states.length).padStart(3, '0')
     const keys = keysOf(snap)
-    const allKeys = (sn) => new Set([...sn.controls.map((c) => `${c.role}|${c.name}`), ...sn.containers.map((c) => `[${c.role}]${c.name}`)])
+    const allKeys = (sn) => new Set([...sn.controls.map(ck), ...sn.containers.map(bk)])
     const parentKeys = parent ? allKeys(parent.snap) : new Set()
-    const added = snap.controls.filter((c) => !parentKeys.has(`${c.role}|${c.name}`))
-    const newContainers = snap.containers.filter((c) => !parentKeys.has(`[${c.role}]${c.name}`) && c.role !== 'tooltip')
+    const added = snap.controls.filter((c) => !parentKeys.has(ck(c)))
+    const newContainers = snap.containers.filter((c) => !parentKeys.has(bk(c)) && c.role !== 'tooltip')
     const navigated = !parent || new URL(snap.url).pathname !== new URL(parent.snap.url).pathname
     const top = newContainers.find((c) => ['dialog', 'alertdialog', 'menu', 'listbox'].includes(c.role)) ?? newContainers[0]
     const menuish = added.length && added.every((c) => c.role.startsWith('menuitem') || c.role === 'separator')
@@ -715,7 +728,7 @@ async function crawl(run) {
     dbg('captured', id, 'controls', list.length)
     // Content below the fold: scroll every scrollable panel and add the controls it hides.
     if (SCROLL && (navigated || ['tab', 'change'].includes(kind)) && snap.scrollables?.length) {
-      const have = new Set([...snap.controls, ...(parent?.snap.controls ?? [])].map((c) => `${c.role}|${c.name}`))
+      const have = new Set([...snap.controls, ...(parent?.snap.controls ?? [])].map(ck))
       let n = 0
       for (const sc of snap.scrollables) {
         for (let step = 1; step <= 6; step++) {
@@ -729,7 +742,7 @@ async function crawl(run) {
           if (!moved) break
           await sleep(250)
           const more = await collect().catch(() => null)
-          for (const c of more?.controls ?? []) if (!have.has(`${c.role}|${c.name}`)) { have.add(`${c.role}|${c.name}`); list.push({ ...c, scrolled: true }) }
+          for (const c of more?.controls ?? []) if (!have.has(ck(c))) { have.add(ck(c)); list.push({ ...c, scrolled: true }) }
           mkdirSync(join(dir, 'scroll'), { recursive: true })
           await shoot({ path: join(dir, 'scroll', `${sc.i}-${step}.jpg`), type: 'jpeg', quality: 65, clip: { x: sc.x, y: sc.y, width: sc.w, height: sc.h } })
           n++
@@ -814,10 +827,11 @@ async function crawl(run) {
     if (ARIA) writeFileSync(join(dir, 'aria.yml'), (await page.locator('body').ariaSnapshot().catch(() => '')).slice(0, 60000))
     const state = {
       id, fp, kind, title, dir: `${id}-${slug(title)}`, url: snap.url, parent: parent?.id ?? null,
+      ownKeys: parent ? [...keysOf(snap)].filter((k) => !keysOf(parent.snap).has(k)) : null,
       depth: parent ? parent.depth + 1 : 0, path: [...(parent?.path ?? []), ...(via ? [via] : [])],
       via: via ? describe(via) : 'start', added: added.length, items: list.map((c) => `${c.role}:${c.name}`), shots, snap,
     }
-    writeFileSync(join(dir, 'info.json'), json({ ...state, snap: undefined, texts: snap.texts }))
+    writeFileSync(join(dir, 'info.json'), json({ ...state, snap: undefined, ownKeys: undefined, texts: snap.texts }))
     states.push(state)
     byFp.set(fp, state)
     console.log(`${id} ${kind.padEnd(12)} ${short(title, 50).padEnd(50)} +${added.length} controls  ← ${state.via}`)
@@ -837,7 +851,7 @@ async function crawl(run) {
     }
     // A page tries every control; a change of its parent (menu, submenu, dialog, tab) only what it added, since the
     // parent's own controls are tried from the parent.
-    const own = state.kind === 'page' || state.parent == null ? state.snap : { ...state.snap, controls: state.snap.controls.filter((c) => !parentKeys.has(`${c.role}|${c.name}`)) }
+    const own = state.kind === 'page' || state.parent == null ? state.snap : { ...state.snap, controls: state.snap.controls.filter((c) => !parentKeys.has(ck(c))) }
     for (const c of candidates(own, parentKeys)) {
       if (states.length >= MAX_) return
       const before = opened.length
@@ -927,7 +941,7 @@ async function crawl(run) {
   if (run.teardown) await page.evaluate(`(async () => {\n${readFileSync(abs(run.teardown), 'utf8')}\n})()`).catch((e) => console.log(`  teardown failed: ${String(e.message).split('\n')[0]}`))
   context.off('page', onPage)
 
-  writeFileSync(join(RUN, 'graph.json'), json({ url: URL_, label, mode: MODE_, setup: run.setup ?? null, entries: run.entries, at: new Date().toISOString(), seconds: Math.round((Date.now() - t0) / 1000), states: states.map(({ snap, items, ...s }) => s), edges }))
+  writeFileSync(join(RUN, 'graph.json'), json({ url: URL_, label, mode: MODE_, setup: run.setup ?? null, entries: run.entries, at: new Date().toISOString(), seconds: Math.round((Date.now() - t0) / 1000), states: states.map(({ snap, items, ownKeys, ...s }) => s), edges }))
   writeFileSync(join(OUT, 'rea.md'), reaNotes(page, list))
   console.log(`\n${states.length} states, ${edges.length} transitions in ${Math.round((Date.now() - t0) / 1000)} s → ${RUN}`)
   if (run.ownWindow) await (await windowSession).send('Target.closeTarget', { targetId: run.targetId }).catch(() => page.close().catch(() => {}))
