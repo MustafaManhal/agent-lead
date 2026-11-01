@@ -14,6 +14,12 @@ It never copies other people's code, images, icons or text into the product.
 | A design reference the user named | Open the link (Figma, Dribbble, a site) with Playwright or the Figma tools if available; capture and annotate. |
 | What the user's existing code does | Read it: search first (`rg`), then only the parts you need. |
 
+## Matching an existing app
+
+Run `tools/scan.mjs` once (or `--plan` with several setups) before writing docs or briefs. Its `INDEX.md` is the
+entry point; briefs cite state folders (`runs/<run>/states/<id>-…/`) and `ui.txt` lines instead of asking the
+worker to look again. Rescan after the app changes.
+
 ## Rules
 
 - **Write it down**: every research task ends in `research/<topic>.md` with: the question, the answer in five lines,
