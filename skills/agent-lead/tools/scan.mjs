@@ -48,6 +48,8 @@
 //   --lock <name>        hold a lock.mjs lock (e.g. the shared reference browser) for the whole scan: waits for it
 //                        (a worker's lock counts as abandoned only after 2 h), refreshes it every 5 min, stops if
 //                        another holder takes it, releases it at the end
+//   --recycle <n> (6)    move to a fresh tab every n reloads (and whenever a load stalls): reloads reuse the tab's
+//                        process, and heavy apps grow until they hang
 //   --parallel           run the plan's runs at the same time, each in its own browser window (about N times
 //                        faster; every run's setup and teardown must leave the other runs' things alone). Not for
 //                        several runs in one shared document of a multiplayer app (Figma): the sessions follow and
@@ -74,7 +76,7 @@ if (indexOnly) args.shift()
 const planFile = o.opt('--plan')
 const PLAN = planFile ? JSON.parse(readFileSync(abs(planFile), 'utf8')) : {}
 // The app address is the first argument that is neither an option nor an option's value.
-const VALUED = new Set(['--lock', '--same', '--out', '--label', '--mode', '--setup', '--entry', '--routes', '--skip', '--max', '--depth', '--per', '--wait', '--load', '--viewport', '--port', '--profile', '--tip', '--allow', '--type', '--color-scheme', '--native', '--teardown', '--ready', '--plan'])
+const VALUED = new Set(['--recycle', '--lock', '--same', '--out', '--label', '--mode', '--setup', '--entry', '--routes', '--skip', '--max', '--depth', '--per', '--wait', '--load', '--viewport', '--port', '--profile', '--tip', '--allow', '--type', '--color-scheme', '--native', '--teardown', '--ready', '--plan'])
 const positional = args.find((a, i) => !a.startsWith('--') && !VALUED.has(args[i - 1]))
 const URL_ = positional ?? PLAN.url ?? cfg.url ?? ref.url
 const host = URL_ ? new URL(URL_).hostname.replace(/^www\./, '') : 'app'
@@ -106,6 +108,7 @@ const ICONS = !o.flag('--no-icons') && cfg.icons !== false
 const SAME = Number(o.opt('--same') ?? cfg.same ?? 3)
 const LOCK = o.opt('--lock') ?? PLAN.lock ?? cfg.lock
 const PARALLEL = o.flag('--parallel') || PLAN.parallel === true
+const RECYCLE = Number(o.opt('--recycle') ?? PLAN.recycle ?? cfg.recycle ?? 6)
 // Routes that create things, belong to the desktop app or internal tools, or change account state: never visited.
 const ROUTE_SKIP = /new|create|try|desktop|preload|test|eval|admin|settings|logout|signout|delete|billing|purchase|upgrade|invite|report|unsubscribe|checkout|jam|import|export|download|install/i
 const DEBUG = o.flag('--debug')
@@ -486,6 +489,42 @@ async function crawl(run) {
     return false
   }
   let fresh = !!run.ownWindow
+  let reloads = 0
+  // Open the start page in a new tab (its own process), switch the scan to it and close the old tab.
+  const freshTab = async (why) => {
+    console.log(`  ${why}: moving to a fresh tab`)
+    const old = page
+    windowSession ??= browser.newBrowserCDPSession()
+    const bs = await windowSession
+    let oldId = null
+    try { const s0 = await context.newCDPSession(old); oldId = (await s0.send('Target.getTargetInfo')).targetInfo.targetId; await s0.detach() } catch {}
+    pendingWindows++
+    const { targetId } = await bs.send('Target.createTarget', { url: START, newWindow: false })
+    let next = null
+    for (let i = 0; i < 100 && !next; i++) {
+      for (const p of context.pages()) {
+        if (scanPages.has(p)) continue
+        const s2 = await context.newCDPSession(p).catch(() => null)
+        const info = await s2?.send('Target.getTargetInfo').catch(() => null)
+        await s2?.detach().catch(() => {})
+        if (info?.targetInfo?.targetId === targetId) { next = p; break }
+      }
+      if (!next) await sleep(100)
+    }
+    if (next) scanPages.add(next)
+    pendingWindows--
+    if (!next) return
+    next.on('dialog', (d) => (d.type() === 'beforeunload' ? d.accept() : d.dismiss()).catch(() => {}))
+    page = next
+    if (run.ownWindow) run.targetId = targetId
+    const c2 = await context.newCDPSession(page).catch(() => null)
+    await c2?.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {})
+    await c2?.send('Page.setWebLifecycleState', { state: 'active' }).catch(() => {})
+    await page.waitForLoadState('domcontentloaded', { timeout: 90000 }).catch(() => {})
+    scanPages.delete(old)
+    if (oldId) await bs.send('Target.closeTarget', { targetId: oldId }).catch(() => old.close().catch(() => {}))
+    else await old.close().catch(() => {})
+  }
   const restore = async (path) => {
     dbg('restore', path.length, 'steps')
     // A window just opened is still loading: reloading it now can stall heavy apps; wait for it instead.
@@ -503,14 +542,19 @@ async function crawl(run) {
     if (await softRestore(path)) return
     // A reload of the same page is safer than navigating to it again (heavy apps such as Figma can stall on a goto).
     if (page.isClosed()) { scanPages.delete(page); page = await context.newPage(); scanPages.add(page); page.on('dialog', (d) => (d.type() === 'beforeunload' ? d.accept() : d.dismiss()).catch(() => {})); console.log('  the scan tab was closed; continuing in a new tab') }
-    const samePage = (() => { try { return new URL(page.url()).pathname === new URL(START).pathname } catch { return false } })()
-    await (samePage ? page.reload({ timeout: 90000, waitUntil: 'domcontentloaded' }) : page.goto(START, { timeout: 90000, waitUntil: 'domcontentloaded' })).catch((e) => console.log(`  reload: ${String(e.message).split('\n')[0]}`))
+    // Reloading always reuses the tab's process, and a heavy app's memory grows with each reload until it hangs
+    // (Figma: 2.4 GB at 100% CPU, stuck on its loading bar). Every RECYCLE reloads, and whenever a load does not
+    // become ready, the scan moves to a fresh tab (a new process) and closes the old one.
+    reloads++
+    if (reloads % RECYCLE === 0) await freshTab('recycling the tab')
+    else {
+      const samePage = (() => { try { return new URL(page.url()).pathname === new URL(START).pathname } catch { return false } })()
+      await (samePage ? page.reload({ timeout: 90000, waitUntil: 'domcontentloaded' }) : page.goto(START, { timeout: 90000, waitUntil: 'domcontentloaded' })).catch((e) => console.log(`  reload: ${String(e.message).split('\n')[0]}`))
+    }
     await page.bringToFront().catch(() => {})
-    // A heavy app can stall on its loading screen: reload again (up to three tries) until it is ready.
     for (let tries = 0; READY && tries < 3; tries++) {
       if (await page.waitForFunction(READY, null, { timeout: 60000, polling: 500 }).then(() => true, () => false)) break
-      console.log('  not ready after loading; reloading again')
-      await page.reload({ timeout: 90000, waitUntil: 'domcontentloaded' }).catch(() => {})
+      await freshTab('not ready after loading')
     }
     await settle(READY ? WAIT * 3 : LOAD)
     await runSetup()
