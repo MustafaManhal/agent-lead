@@ -23,7 +23,7 @@ Both share the same project files (`.agent-lead/LEAD.md`, `WORKER.md`, `status.m
 | Checklist page | `skills/agent-lead/plan-page.mjs` + `checklist-page.md` | The plan as one HTML page (progress, next item, folding milestone cards). Asked once per project, published with the Artifact tool to one stable link (or kept local), rebuilt after every checklist change. |
 | Launcher | `skills/agent-lead/agent-run`, installed to `~/.claude/agent-runs/agent-run` | For the known CLIs: builds the headless command with its stream flag, puts `worker-rules.md` in front of the brief, applies per-run limits, calls the wrapper, prints `SESSION <cli> <id>`. |
 | Run wrapper | `skills/agent-lead/run-agent.sh`, installed to `~/.claude/agent-runs/run-agent.sh` | Runs any CLI, frames its output with start/end lines, writes the live log. |
-| Setup | `skills/agent-lead/setup.sh`, run once per machine by the user | Installs the scripts, adds user-level Claude Code allow rules for them, adds the safe set to agy's and Cursor's allow-list files. Idempotent, backs up what it changes. |
+| Setup | `hooks/first-run.sh` (SessionStart hook declared in `plugin.json`) runs `install-lead.sh` and `skills/agent-lead/setup.sh` once per plugin version; marker in `${CLAUDE_PLUGIN_DATA}` | Installs the scripts, adds user-level Claude Code allow rules for them, adds the safe set to agy's and Cursor's allow-list files. Idempotent, backs up what it changes. |
 | Pane `/agent` (alias `/agy`) | `hooks/register.tsx` + `hooks/parse.ts` | Live view of the run beside the chat. |
 | Worker rules | Pane: `skills/agent-lead/worker-rules.md`, prepended to every new brief by `agent-run` (role, allowed commands, no shell file reading, no commits, report). Both modes: the project's `.agent-lead/WORKER.md` (template `templates/WORKER.md`), which the brief tells the worker to read. | |
 | Per-run limits | built into `agent-run` | Claude Code `--allowedTools`, Gemini/Qwen `--allowed-tools`, Codex `--sandbox workspace-write`, OpenCode a temporary `opencode.json` (deleted on exit), agy and Cursor their allow-list files from setup. |
@@ -75,7 +75,7 @@ Denials: any error text matching `denied|not allowed|permission|rejected|decline
 
 ## Allow lists (learned the hard way)
 
-- Setup is once per machine (`setup.sh`, run by the user); nothing per project or session. Claude Code's auto mode refuses to edit settings or agent allow lists itself, which is why the user runs it.
+- Setup runs automatically once per plugin version (`hooks/first-run.sh`, a SessionStart hook, so it runs as the user's own shell command, not as a model tool call; Claude Code's auto mode refuses to edit settings or agent allow lists itself). `setup.sh` stays runnable by hand. Nothing per project or session.
 - Verified: OpenCode ignores permissions passed through `OPENCODE_CONFIG` or `OPENCODE_CONFIG_CONTENT` but honours an `opencode.json` in the run folder, so `agent-run` writes one there for the run and deletes it on exit (it leaves an existing one alone).
 
 - Headless workers cannot ask. Anything not allowed is refused, and on some CLIs (agy) one refusal ends the run.

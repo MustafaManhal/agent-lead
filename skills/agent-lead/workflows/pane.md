@@ -5,8 +5,9 @@ codes, refused commands in red, its reply, time and tokens) shows live in the `/
 
 ## One-time setup (per machine, by the user)
 
-Check: `test -x ~/.claude/agent-runs/agent-run && echo ready`. If it is not ready, ask the user to run this once
-themselves (it edits their settings, so it must be them), then restart Claude Code or run `/reload-plugins`:
+The plugin's first-run hook installs this automatically. Check: `test -x ~/.claude/agent-runs/agent-run && echo
+ready`. If it is not ready, read `~/.claude/agent-runs/setup.log` and ask the user to run this once themselves (it
+edits their settings, so it must be them), then restart Claude Code or run `/reload-plugins`:
 
 ```
 ! bash <this skill's folder>/setup.sh

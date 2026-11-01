@@ -33,7 +33,7 @@ when it ran; ask it only when the skill was started without `/lead`.
      terminal, an IDE, a second Claude Code). Recommend it when the user wants to watch several agents side by side
      or uses a tool `agent-run` does not launch.
    - "Pane (I launch the worker, you watch /agent)" — you start the worker CLI headless with `agent-run`; the
-     `/agent` pane shows every step live. Needs the one-time `setup.sh` (`workflows/pane.md`).
+     `/agent` pane shows every step live. The plugin set it up on install (`workflows/pane.md` if it is missing).
 2. **Worker** — which agent and, if they care, which model. Pane needs a CLI `agent-run` knows (`clis.md`) or any CLI
    through `run-agent.sh`. Handoff works with anything.
 3. **Docs and checklist** — "Found <files>: build the missing docs from them" (recommended when some exist) / "New

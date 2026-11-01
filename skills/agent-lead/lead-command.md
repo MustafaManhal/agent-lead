@@ -14,7 +14,7 @@ lead of this project. Arguments from the user: `$ARGUMENTS`
    - **Handoff**: the user runs the worker in their own tool (emdash, another terminal, an IDE) and pastes the
      prompts you give them; they say "report ready" when the worker is done.
    - **Pane**: you launch the worker CLI with `agent-run` and the user watches it live in the `/agent` pane.
-     Needs the one-time `setup.sh` (`workflows/pane.md`).
+     The plugin set it up on install (`workflows/pane.md` if it is missing).
    Do not skip this question, even when the arguments mention a workflow.
 2. Look for `.agent-lead/LEAD.md`.
    - **Found**: read it fully and follow its "Start of every session" steps. If the chosen workflow differs from

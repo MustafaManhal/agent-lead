@@ -20,7 +20,7 @@ Gemini CLI, OpenCode and Cursor can be the lead too ([install for other agents](
 | Watching | In your tool, side by side with other agents | The `/agent` pane beside the chat: files, commands, refusals, reply, tokens |
 | When it's done | You tell the lead "report ready" | The run ends; the lead reviews right away |
 | Worker can | Use the project's real tools (dev server, browser, screenshots) | Run only allow-listed commands (widen per run) |
-| Setup | None | `setup.sh` once per machine |
+| Setup | None | None (the plugin sets itself up) |
 
 ## Start
 
@@ -69,7 +69,7 @@ Every later session: run `/lead` again. Pick the workflow (keep the current one 
 | `/agent` pane | Live view of a Pane-mode run: each file read or written, each command with its exit code, refused commands in red, the reply, time and tokens. Opens by itself; `/agent close` hides it. `/agy` still works. |
 | Tools (`skills/agent-lead/tools/`) | Small commands that work in any project, configured by one optional `.agent-lead/config.json` (detected when missing): `next` (the next item with the files to read), `check` (typecheck, lint, tests in one line), `done` and `ship` (mark the plan, rebuild the page, commit with the worker's credit), `land` (merge with compact conflicts); `outline`, `show`, `rep`, `snippet` (read and edit code cheaply); `play` (real input through Playwright), `observe` (a reference product in a browser that stays signed in), `audit-ui` (overflow, tap targets and contrast at nine widths); `research.py`, `ask` (offload to a cheaper model), `lock` (shared resources between parallel workers); macOS helpers for windows, input and the clipboard. See `skills/agent-lead/tools.md`. |
 | `agent-run`, `run-agent.sh` | Launch a worker CLI headless with per-run limits and record it for the pane. |
-| `setup.sh` | One-time setup for Pane mode. |
+| `hooks/first-run.sh` | Sets the plugin up on the first session after install or update: `/lead` (`install-lead.sh`) and the Pane-mode scripts (`setup.sh`). |
 
 ## Install
 
@@ -79,21 +79,23 @@ At the prompt of a Claude Code terminal session:
 /plugin install agent-lead --marketplace MustafaManhal/agent-lead
 ```
 
-Answer `y` to add the marketplace, then pick a scope (user scope is best).
+Answer `y` to add the marketplace, then pick a scope (user scope is best). That is the only step.
 
-Then install the `/lead` command once (Claude Code shows plugin commands with the plugin's prefix, so the plugin
-puts a plain `/lead` in your own commands folder, `~/.claude/commands/lead.md`):
+The next time Claude Code starts, the plugin sets itself up (a SessionStart hook, `hooks/first-run.sh`, once per
+plugin version):
+- installs the plain `/lead` command in `~/.claude/commands/lead.md` (Claude Code shows plugin commands with the
+  plugin's prefix, so the plugin puts `/lead` in your own commands folder);
+- installs the Pane-mode scripts (`agent-run`, `run-agent.sh`, worker rules) in `~/.claude/agent-runs/`, lets Claude
+  Code run them, and adds a safe allow list to agy and Cursor Agent if you have them (backups first).
 
-```bash
-bash ~/.claude/plugins/marketplaces/agent-lead/skills/agent-lead/install-lead.sh
-```
-
-Run `/reload-plugins`. `/lead` now works in every project.
+Restart Claude Code after installing (or run `/reload-plugins` twice: once to load the hook, once to see `/lead`).
+Then run `/lead` in any project. The log is `~/.claude/agent-runs/setup.log`. To uninstall, remove the plugin and
+delete `~/.claude/commands/lead.md`.
 From a shell: `claude plugin install agent-lead --marketplace MustafaManhal/agent-lead`. In the desktop app: + next
 to the prompt box, Plugins, Add marketplace `MustafaManhal/agent-lead`, then Add plugin.
 
-Already installed? Update it (`/plugin marketplace update agent-lead`), run `install-lead.sh` again to refresh
-`/lead`, then run `/reload-plugins`.
+Already installed? Update it (`/plugin marketplace update agent-lead`) and restart Claude Code; the setup runs again
+for the new version.
 
 ### Codex, Gemini CLI, OpenCode, Cursor and other agents
 
@@ -130,16 +132,11 @@ What changes when the lead is not Claude Code:
 
 Workers need nothing installed: any coding agent CLI can be the worker in either workflow.
 
-## Pane mode setup (once per machine)
+## Pane mode
 
-1. Install and sign in to the worker CLI(s) you want to use.
-2. Run the setup script yourself (the lead asks you to when it is missing):
-   ```
-   bash ~/.claude/plugins/cache/agent-lead/agent-lead/*/skills/agent-lead/setup.sh
-   ```
-   It installs `agent-run` and `run-agent.sh` in `~/.claude/agent-runs/`, lets Claude Code run them in every
-   project, and adds a safe allow list to agy and Cursor Agent if you have them. It backs up every file it changes.
-3. Restart Claude Code (or `/reload-plugins`).
+Install and sign in to the worker CLI(s) you want to use. The plugin's first-run setup already installed
+`agent-run` and its allow rules. If it did not (no Node.js, for example; see `~/.claude/agent-runs/setup.log`),
+run it by hand: `bash ~/.claude/plugins/marketplaces/agent-lead/skills/agent-lead/setup.sh`, then restart.
 
 Handoff mode needs no setup.
 
