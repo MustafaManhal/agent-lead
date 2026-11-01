@@ -48,6 +48,8 @@
 //   --lock <name>        hold a lock.mjs lock (e.g. the shared reference browser) for the whole scan: waits for it
 //                        (a worker's lock counts as abandoned only after 2 h), refreshes it every 5 min, stops if
 //                        another holder takes it, releases it at the end
+//   --parallel           run the plan's runs at the same time, each in its own browser window (about N times
+//                        faster; every run's setup and teardown must leave the other runs' things alone)
 //   --no-tooltips (also skips hover styles)  --no-rea  --no-routes (do not visit REA's routes)  --tip <ms> (700, hover time per tooltip)
 //
 // Safety: it never types, never clicks names matching the destructive list (delete, share, publish, pay, sign
@@ -101,6 +103,7 @@ const SCROLL = !o.flag('--no-scroll') && cfg.scroll !== false
 const ICONS = !o.flag('--no-icons') && cfg.icons !== false
 const SAME = Number(o.opt('--same') ?? cfg.same ?? 3)
 const LOCK = o.opt('--lock') ?? PLAN.lock ?? cfg.lock
+const PARALLEL = o.flag('--parallel') || PLAN.parallel === true
 // Routes that create things, belong to the desktop app or internal tools, or change account state: never visited.
 const ROUTE_SKIP = /new|create|try|desktop|preload|test|eval|admin|settings|logout|signout|delete|billing|purchase|upgrade|invite|report|unsubscribe|checkout|jam|import|export|download|install/i
 const DEBUG = o.flag('--debug')
@@ -132,6 +135,10 @@ const json = (v) => JSON.stringify(v, null, 1)
 
 // Tooltips and hover looks already recorded in this scan (the same toolbar shows in every run).
 const hoverSeen = new Map()
+// Pages the scan works in (one per run); other tabs the app opens are closed.
+const scanPages = new Set()
+let sharedBrowser = null
+let windowSession = null
 
 if (!indexOnly) await main()
 writeIndex()
@@ -155,7 +162,10 @@ async function main() {
     beat.unref()
   }
   if (NATIVE) { await nativeScan(NATIVE); console.log(`done in ${Math.round((Date.now() - t0) / 1000)} s`); return }
-  for (const run of runs) await crawl(run)
+  if (PARALLEL && runs.length > 1) {
+    console.log(`running ${runs.length} runs at the same time, one window each`)
+    await Promise.all(runs.map((run) => crawl({ ...run, ownWindow: true })))
+  } else for (const run of runs) await crawl(run)
   if (REA) {
     const routes = await reaPass()
     const concrete = routes.filter((r) => r.startsWith('/') && r !== '/' && !/[$:{}*]/.test(r) && !SKIP.test(r) && !ROUTE_SKIP.test(r))
@@ -164,6 +174,7 @@ async function main() {
       await crawl({ label: 'routes', url: new URL(concrete[0], new URL(URL_).origin).href, setup: null, entries: concrete.map((r) => `route:${r}`), mode: 'safe', max: Math.max(MAX, concrete.length + 20), depth: 1, per: 12 })
     }
   }
+  if (sharedBrowser) await (await sharedBrowser).close().catch(() => {}) // disconnects; the user's browser stays open
   console.log(`done in ${Math.round((Date.now() - t0) / 1000)} s`)
 }
 
@@ -269,18 +280,43 @@ async function crawl(run) {
     console.error(`No browser on ${ENDPOINT}. Start it with: node ${join(toolsDir, 'observe.mjs')} start --url ${URL_}`)
     process.exit(1)
   }
-  const browser = await chromium.connectOverCDP(ENDPOINT, { timeout: 20000 })
+  // One connection for every run, so parallel runs see the same page objects.
+  sharedBrowser ??= chromium.connectOverCDP(ENDPOINT, { timeout: 20000 })
+  const browser = await sharedBrowser
   const origin = new URL(URL_).origin
   const startPath = new URL(START).pathname
-  let page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(origin) && new URL(p.url()).pathname === startPath)
-  page ??= browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(origin))
-  if (!page) {
-    page = await browser.contexts()[0].newPage()
-    await page.goto(START)
+  let page = null
+  if (run.ownWindow) {
+    // Parallel runs: a window of its own (a background tab is throttled), registered so no other run closes it.
+    // Find the page by the id Chrome gives the new window: no guessing between runs opening windows at once.
+    windowSession ??= browser.newBrowserCDPSession()
+    const bs = await windowSession
+    const { targetId } = await bs.send('Target.createTarget', { url: START, newWindow: true })
+    run.targetId = targetId
+    for (let i = 0; i < 100 && !page; i++) {
+      for (const p of browser.contexts().flatMap((c) => c.pages())) {
+        if (scanPages.has(p)) continue
+        const s2 = await p.context().newCDPSession(p).catch(() => null)
+        const info = await s2?.send('Target.getTargetInfo').catch(() => null)
+        await s2?.detach().catch(() => {})
+        if (info?.targetInfo?.targetId === targetId) { page = p; break }
+      }
+      if (!page) await sleep(100)
+    }
+    if (!page) throw new Error(`run ${label}: no window opened`)
+  } else {
+    page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(origin) && new URL(p.url()).pathname === startPath && !scanPages.has(p)) ?? null
+    page ??= browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(origin) && !scanPages.has(p)) ?? null
+    if (!page) {
+      page = await browser.contexts()[0].newPage()
+      await page.goto(START)
+    }
   }
+  scanPages.add(page)
   const context = page.context()
   const opened = []
-  const onPage = (p) => { if (p !== page) { opened.push(p.url()); p.close().catch(() => {}) } }
+  // Tabs the app opens are closed (after a moment, so a window another run is opening is never mistaken for one).
+  const onPage = (p) => setTimeout(() => { if (!scanPages.has(p) && !p.isClosed()) { opened.push(p.url()); p.close().catch(() => {}) } }, 1500)
   context.on('page', onPage)
   // Leave-page prompts are accepted (a reload is how the scan goes back); every other dialog is dismissed.
   page.on('dialog', (d) => (d.type() === 'beforeunload' ? d.accept() : d.dismiss()).catch(() => {}))
@@ -306,12 +342,12 @@ async function crawl(run) {
   const byFp = new Map()
   const t0 = Date.now()
 
-  const collect = async () => {
+  const collect = async (lite = false) => {
     if (page.isClosed()) throw new Error('the scan tab was closed')
     for (let i = 0; i < 3; i++) {
       try {
         if (!(await page.evaluate(() => typeof window.__scanCollect === 'function'))) await page.evaluate(COLLECT)
-        return await page.evaluate((opts) => window.__scanCollect(opts), { pointer: MODE_ === 'wide' })
+        return await page.evaluate((opts) => window.__scanCollect(opts), { pointer: MODE_ === 'wide', lite })
       } catch { await sleep(500) }
     }
     throw new Error('the page did not answer (navigating?)')
@@ -340,6 +376,24 @@ async function crawl(run) {
   const fpOf = (snap) => createHash('sha1').update(new URL(snap.url).pathname + '\n' + [...keysOf(snap)].sort().join('\n')).digest('hex').slice(0, 10)
   // Wait until the page stops changing, at most `ms` (the old fixed wait); without the helper (a new page), sleep.
   let lastUrl = ''
+  // Screenshots straight through Chrome (optimizeForSpeed: lighter compression, no Playwright round trips), in CSS
+  // pixels; Playwright's own call is the fallback. Same options as page.screenshot: { path, type, quality, clip }.
+  let shotCdp = null
+  let shotPage = null
+  let dpr = 1
+  const shoot = async (o = {}) => {
+    try {
+      if (shotPage !== page) { shotCdp = await context.newCDPSession(page); shotPage = page; dpr = await page.evaluate(() => devicePixelRatio) }
+      const vp = o.clip ?? (await page.evaluate(() => ({ x: 0, y: 0, width: innerWidth, height: innerHeight })))
+      const format = o.type === 'jpeg' ? 'jpeg' : 'png'
+      const r = await shotCdp.send('Page.captureScreenshot', { format, ...(format === 'jpeg' ? { quality: o.quality ?? 70 } : {}), clip: { ...vp, scale: 1 / dpr }, optimizeForSpeed: true, captureBeyondViewport: false })
+      const buf = Buffer.from(r.data, 'base64')
+      if (o.path) writeFileSync(o.path, buf)
+      return buf
+    } catch {
+      return page.screenshot({ ...o, scale: 'css' }).catch(() => null)
+    }
+  }
   const settle = async (ms = WAIT) => {
     // A load check only after the address changed (on an unchanged page it can wait for its full timeout).
     const url = page.url()
@@ -381,7 +435,7 @@ async function crawl(run) {
     if (MOTION && (['right', 'key'].includes(a.kind) || (['click', 'hover'].includes(a.kind) && (a.popup || a.role === 'tab' || a.role?.startsWith('menuitem') || !a.role)))) {
       for (const t of [60, 160, 320]) {
         await sleep(t - (frames.length ? [60, 160, 320][frames.length - 1] : 0))
-        frames.push(await page.screenshot({ type: 'jpeg', quality: 60, scale: 'css' }).catch(() => null))
+        frames.push(await shoot({ type: 'jpeg', quality: 60 }))
       }
     }
     await settle(a.kind === 'route' ? LOAD : a.kind === 'wait' ? 0 : WAIT)
@@ -396,7 +450,7 @@ async function crawl(run) {
     for (let i = 0; i < 5; i++) {
       // Last try: the setup script also resets UI the app remembers (an open side panel, a mode).
       if (i === 4) { await runSetup(); await settle() }
-      const snap = await collect().catch(() => null)
+      const snap = await collect(true).catch(() => null)
       if (snap && sameAs(snap, states[0])) {
         for (const a of path) await doAction(a)
         return true
@@ -411,7 +465,7 @@ async function crawl(run) {
     dbg('restore', path.length, 'steps')
     if (await softRestore(path)) return
     // A reload of the same page is safer than navigating to it again (heavy apps such as Figma can stall on a goto).
-    if (page.isClosed()) { page = await context.newPage(); page.on('dialog', (d) => (d.type() === 'beforeunload' ? d.accept() : d.dismiss()).catch(() => {})); console.log('  the scan tab was closed; continuing in a new tab') }
+    if (page.isClosed()) { scanPages.delete(page); page = await context.newPage(); scanPages.add(page); page.on('dialog', (d) => (d.type() === 'beforeunload' ? d.accept() : d.dismiss()).catch(() => {})); console.log('  the scan tab was closed; continuing in a new tab') }
     const samePage = (() => { try { return new URL(page.url()).pathname === new URL(START).pathname } catch { return false } })()
     await (samePage ? page.reload({ timeout: 90000, waitUntil: 'domcontentloaded' }) : page.goto(START, { timeout: 90000, waitUntil: 'domcontentloaded' })).catch((e) => console.log(`  reload: ${String(e.message).split('\n')[0]}`))
     await page.bringToFront().catch(() => {})
@@ -431,14 +485,14 @@ async function crawl(run) {
     // Clear text a search step typed.
     await page.evaluate(() => { const el = document.activeElement; if (el && 'value' in el && el.value) { const set = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value')?.set; set?.call(el, ''); el.dispatchEvent(new Event('input', { bubbles: true })) } }).catch(() => {})
     for (let i = 0; i < 3; i++) {
-      const snap = await collect().catch(() => null)
+      const snap = await collect(true).catch(() => null)
       if (snap && sameAs(snap, state)) return true
       if (snap && new URL(snap.url).pathname !== new URL(state.url).pathname) await page.goBack({ waitUntil: 'commit', timeout: 5000 }).catch(() => {})
       else await page.keyboard.press('Escape')
       await settle()
     }
     await restore(state.path)
-    const snap = await collect().catch(() => null)
+    const snap = await collect(true).catch(() => null)
     if (snap && sameAs(snap, state)) return true
     if (snap) {
       const a = keysOf(snap)
@@ -508,7 +562,7 @@ async function crawl(run) {
     mkdirSync(dir, { recursive: true })
     const shotFrames = frames
     frames = []
-    await page.screenshot({ path: join(dir, 'shot.jpg'), type: 'jpeg', quality: 70, scale: 'css' }).catch(() => {})
+    await shoot({ path: join(dir, 'shot.jpg'), type: 'jpeg', quality: 70 })
     const shots = ['shot.jpg']
     if (parent && shotFrames.filter(Boolean).length) {
       mkdirSync(join(dir, 'motion'), { recursive: true })
@@ -522,7 +576,7 @@ async function crawl(run) {
       const y = Math.max(0, Math.min(...boxes.map((b) => b.y)) - 8)
       const w = Math.min(snap.viewport[0] - x, Math.max(...boxes.map((b) => b.x + b.w)) + 8 - x)
       const h = Math.min(snap.viewport[1] - y, Math.max(...boxes.map((b) => b.y + b.h)) + 8 - y)
-      if (w > 4 && h > 4) { await page.screenshot({ path: join(dir, 'opened.png'), clip: { x, y, width: w, height: h }, scale: 'css' }).catch(() => {}); shots.push('opened.png') }
+      if (w > 4 && h > 4) { await shoot({ path: join(dir, 'opened.png'), clip: { x, y, width: w, height: h } }); shots.push('opened.png') }
     }
     // Panels and bars of every page state and of changes inside the page (a tab, a selection).
     if (navigated || ['tab', 'change'].includes(kind)) {
@@ -532,7 +586,7 @@ async function crawl(run) {
         let name = slug(g.name)
         while (used.has(name)) name += '-2'
         used.add(name)
-        await page.screenshot({ path: join(dir, 'regions', `${name}.png`), clip: { x: g.x, y: g.y, width: g.w, height: g.h }, scale: 'css' }).catch(() => {})
+        await shoot({ path: join(dir, 'regions', `${name}.png`), clip: { x: g.x, y: g.y, width: g.w, height: g.h } })
         shots.push(`regions/${name}.png`)
       }
     }
@@ -556,7 +610,7 @@ async function crawl(run) {
           const more = await collect().catch(() => null)
           for (const c of more?.controls ?? []) if (!have.has(`${c.role}|${c.name}`)) { have.add(`${c.role}|${c.name}`); list.push({ ...c, scrolled: true }) }
           mkdirSync(join(dir, 'scroll'), { recursive: true })
-          await page.screenshot({ path: join(dir, 'scroll', `${sc.i}-${step}.jpg`), type: 'jpeg', quality: 65, clip: { x: sc.x, y: sc.y, width: sc.w, height: sc.h }, scale: 'css' }).catch(() => {})
+          await shoot({ path: join(dir, 'scroll', `${sc.i}-${step}.jpg`), type: 'jpeg', quality: 65, clip: { x: sc.x, y: sc.y, width: sc.w, height: sc.h } })
           n++
         }
         await page.evaluate((i) => { const el = i === 'page' ? document.scrollingElement : document.querySelector(`[data-scan-scroll="${i}"]`); if (el) el.scrollTop = 0 }, sc.i).catch(() => {})
@@ -569,7 +623,7 @@ async function crawl(run) {
       for (const c of list) {
         if (k >= 200 || !c.look?.icon || c.scrolled || c.w > 64 || c.h > 64) continue
         mkdirSync(join(dir, 'icons'), { recursive: true })
-        await page.screenshot({ path: join(dir, 'icons', `${slug(c.name || c.role)}-${c.x}-${c.y}.png`), clip: { x: c.x, y: c.y, width: c.w, height: c.h }, scale: 'css' }).catch(() => {})
+        await shoot({ path: join(dir, 'icons', `${slug(c.name || c.role)}-${c.x}-${c.y}.png`), clip: { x: c.x, y: c.y, width: c.w, height: c.h } })
         k++
       }
       if (k) shots.push('icons/*.png')
@@ -622,7 +676,7 @@ async function crawl(run) {
       }
       await page.mouse.move(snap.viewport[0] - 2, snap.viewport[1] - 2)
       await sleep(150)
-      if (n && fpOf(await collect()) !== fp0) await page.keyboard.press('Escape')
+      if (n && fpOf(await collect(true)) !== fp0) await page.keyboard.press('Escape')
     }
     const line = (c) => `${c.role} "${c.name}" @${c.x},${c.y} ${c.w}x${c.h}${c.state ? ' ' + Object.entries(c.state).map(([k, v]) => (v === 'true' ? k : `${k}=${v}`)).join(' ') : ''}${c.tip ? ` tip="${c.tip}"` : ''}${c.hover?.bg ? ` hover-bg=${c.hover.bg}` : ''}${c.scrolled ? ' (scrolled into view)' : ''}`
     writeFileSync(
@@ -668,7 +722,7 @@ async function crawl(run) {
       const before = opened.length
       try {
         // Go back only when needed: the next control must still be on screen with everything of this state.
-        const cur = first ? state.snap : await collect()
+        const cur = first ? state.snap : await collect(true)
         first = false
         const curKeys = keysOf(cur)
         // Exactly this state, or (hovering from one menu item to the next) this state plus a submenu still open.
@@ -676,7 +730,8 @@ async function crawl(run) {
         const ready = sameAs(cur, state) || (c.kind === 'hover' && visible && [...stateKeys].every((k) => curKeys.has(k)) && [...curKeys].filter((k) => !stateKeys.has(k)).every((k) => k.startsWith('menuitem') || k.startsWith('[menu]')))
         if (!ready && !(await goBackTo(state))) { console.log(`  could not return to ${state.id}; skipping the rest of it`); return }
         await doAction(c)
-        const snap = await collect()
+        // A quick look decides; the full read (styles, regions, texts) only for a new state.
+        const snap = await collect(true)
         if (c.kind === 'search') { /* results captured below; the box is cleared on the way back */ }
         const fp = fpOf(snap)
         if (opened.length > before) edges.push({ from: state.id, action: describe(c), to: `new tab ${opened.at(-1)}` })
@@ -692,7 +747,7 @@ async function crawl(run) {
         if (shape) shapes.set(shape, (shapes.get(shape) ?? 0) + 1)
         if (known) edges.push({ from: state.id, action: describe(c), to: known.id })
         else {
-          const child = await record(snap, state, c)
+          const child = await record(await collect(), state, c)
           if (aFp) byAdded.set(aFp, child)
           edges.push({ from: state.id, action: describe(c), to: child.id })
           await explore(child)
@@ -751,7 +806,8 @@ async function crawl(run) {
   writeFileSync(join(RUN, 'graph.json'), json({ url: URL_, label, mode: MODE_, setup: run.setup ?? null, entries: run.entries, at: new Date().toISOString(), seconds: Math.round((Date.now() - t0) / 1000), states: states.map(({ snap, items, ...s }) => s), edges }))
   writeFileSync(join(OUT, 'rea.md'), reaNotes(page, list))
   console.log(`\n${states.length} states, ${edges.length} transitions in ${Math.round((Date.now() - t0) / 1000)} s → ${RUN}`)
-  await browser.close().catch(() => {}) // disconnects; the user's browser stays open
+  if (run.ownWindow) await (await windowSession).send('Target.closeTarget', { targetId: run.targetId }).catch(() => page.close().catch(() => {}))
+  scanPages.delete(page)
 }
 
 function reaNotes(page, list) {

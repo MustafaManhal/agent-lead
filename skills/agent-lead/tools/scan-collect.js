@@ -138,7 +138,8 @@ window.__scanCollect = (opts = {}) => {
     if (el.getAttribute('aria-hidden') === 'true' || el.closest('[aria-hidden="true"]')) continue
     const st = stateOf(el)
     if (Object.keys(st).length) item.state = st
-    // Exact look of the control, so nobody needs to measure it again.
+    // Exact look of the control, so nobody needs to measure it again (skipped in a quick "did it change" check).
+    if (opts.lite) { const key = `${item.role}|${item.name}|${item.x}|${item.y}`; if (!seen.has(key)) { seen.add(key); controls.push(item) } continue }
     const cs = getComputedStyle(el)
     const look = {
       font: `${cs.fontFamily.split(',')[0].replace(/["']/g, '').trim()} ${cs.fontSize}/${cs.lineHeight} ${cs.fontWeight}`,
@@ -159,6 +160,7 @@ window.__scanCollect = (opts = {}) => {
     controls.push(item)
   }
 
+  if (opts.lite) return { url: location.href, title: document.title, viewport: [W, H], controls, containers, headings: [], regions: [], styles: {}, texts: [], scrollables: [], lite: true }
   // Big visible blocks with their own background or border: panels, bars, sidebars.
   const regions = []
   const minArea = W * H * 0.02
