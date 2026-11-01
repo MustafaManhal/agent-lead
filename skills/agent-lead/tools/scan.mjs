@@ -49,7 +49,9 @@
 //                        (a worker's lock counts as abandoned only after 2 h), refreshes it every 5 min, stops if
 //                        another holder takes it, releases it at the end
 //   --parallel           run the plan's runs at the same time, each in its own browser window (about N times
-//                        faster; every run's setup and teardown must leave the other runs' things alone)
+//                        faster; every run's setup and teardown must leave the other runs' things alone). Not for
+//                        several runs in one shared document of a multiplayer app (Figma): the sessions follow and
+//                        affect each other; run those one after another.
 //   --no-tooltips (also skips hover styles)  --no-rea  --no-routes (do not visit REA's routes)  --tip <ms> (700, hover time per tooltip)
 //
 // Safety: it never types, never clicks names matching the destructive list (delete, share, publish, pay, sign
@@ -139,6 +141,7 @@ const hoverSeen = new Map()
 const scanPages = new Set()
 let sharedBrowser = null
 let windowSession = null
+let pendingWindows = 0
 
 if (!indexOnly) await main()
 writeIndex()
@@ -158,6 +161,9 @@ async function main() {
     const release = () => { try { execFileSync('node', [lockTool, 'release', LOCK, holder], { stdio: 'pipe' }) } catch {} }
     process.on('exit', release)
     for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(130))
+    // A crash still releases the lock (and says why it stopped).
+    process.on('uncaughtException', (e) => { console.log(`stopped: ${String(e?.stack ?? e).split('\n').slice(0, 3).join(' | ')}`); release(); process.exit(1) })
+    process.on('unhandledRejection', (e) => { console.log(`stopped: ${String(e?.stack ?? e).split('\n').slice(0, 3).join(' | ')}`); release(); process.exit(1) })
     beat = setInterval(() => { if (!takeLock(1)) { console.log(`lock ${LOCK} was taken by someone else; stopping the scan`); process.exit(3) } }, 5 * 60 * 1000)
     beat.unref()
   }
@@ -296,6 +302,7 @@ async function crawl(run) {
   if (run.ownWindow) {
     // Parallel runs: a window of its own (a background tab is throttled), registered so no other run closes it.
     // Find the page by the id Chrome gives the new window: no guessing between runs opening windows at once.
+    pendingWindows++
     windowSession ??= browser.newBrowserCDPSession()
     const bs = await windowSession
     const { targetId } = await bs.send('Target.createTarget', { url: START, newWindow: true })
@@ -310,6 +317,7 @@ async function crawl(run) {
       }
       if (!page) await sleep(100)
     }
+    pendingWindows--
     if (!page) throw new Error(`run ${label}: no window opened`)
   } else {
     page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(origin) && new URL(p.url()).pathname === startPath && !scanPages.has(p)) ?? null
@@ -323,7 +331,15 @@ async function crawl(run) {
   const context = page.context()
   const opened = []
   // Tabs the app opens are closed (after a moment, so a window another run is opening is never mistaken for one).
-  const onPage = (p) => setTimeout(() => { if (!scanPages.has(p) && !p.isClosed()) { opened.push(p.url()); p.close().catch(() => {}) } }, 1500)
+  const onPage = (p) => {
+    const check = () => {
+      if (scanPages.has(p) || p.isClosed()) return
+      if (pendingWindows > 0) return setTimeout(check, 1000) // another run is still finding its new window
+      opened.push(p.url())
+      p.close().catch(() => {})
+    }
+    setTimeout(check, 1500)
+  }
   context.on('page', onPage)
   // Leave-page prompts are accepted (a reload is how the scan goes back); every other dialog is dismissed.
   page.on('dialog', (d) => (d.type() === 'beforeunload' ? d.accept() : d.dismiss()).catch(() => {}))
@@ -402,6 +418,7 @@ async function crawl(run) {
     }
   }
   const settle = async (ms = WAIT) => {
+    if (page.isClosed()) return
     // A load check only after the address changed (on an unchanged page it can wait for its full timeout).
     const url = page.url()
     if (url !== lastUrl) { lastUrl = url; await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {}) }
@@ -468,8 +485,21 @@ async function crawl(run) {
     }
     return false
   }
+  let fresh = !!run.ownWindow
   const restore = async (path) => {
     dbg('restore', path.length, 'steps')
+    // A window just opened is still loading: reloading it now can stall heavy apps; wait for it instead.
+    if (fresh) {
+      fresh = false
+      await page.waitForLoadState('domcontentloaded', { timeout: 90000 }).catch(() => {})
+      if (!READY || (await page.waitForFunction(READY, null, { timeout: 90000, polling: 500 }).then(() => true, () => false))) {
+        await settle(WAIT * 3)
+        await runSetup()
+        await settle()
+        for (const a of path) await doAction(a)
+        return
+      }
+    }
     if (await softRestore(path)) return
     // A reload of the same page is safer than navigating to it again (heavy apps such as Figma can stall on a goto).
     if (page.isClosed()) { scanPages.delete(page); page = await context.newPage(); scanPages.add(page); page.on('dialog', (d) => (d.type() === 'beforeunload' ? d.accept() : d.dismiss()).catch(() => {})); console.log('  the scan tab was closed; continuing in a new tab') }
@@ -491,14 +521,14 @@ async function crawl(run) {
     dbg('back to', state.id)
     // Clear text a search step typed.
     await page.evaluate(() => { const el = document.activeElement; if (el && 'value' in el && el.value) { const set = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value')?.set; set?.call(el, ''); el.dispatchEvent(new Event('input', { bubbles: true })) } }).catch(() => {})
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 3 && !page.isClosed(); i++) {
       const snap = await collect(true).catch(() => null)
       if (snap && sameAs(snap, state)) return true
       if (snap && new URL(snap.url).pathname !== new URL(state.url).pathname) await page.goBack({ waitUntil: 'commit', timeout: 5000 }).catch(() => {})
-      else await page.keyboard.press('Escape')
-      await settle()
+      else await page.keyboard.press('Escape').catch(() => {})
+      await settle().catch(() => {})
     }
-    await restore(state.path)
+    await restore(state.path).catch((e) => console.log(`  restore: ${String(e.message).split('\n')[0]}`))
     const snap = await collect(true).catch(() => null)
     if (snap && sameAs(snap, state)) return true
     if (snap) {
@@ -773,9 +803,12 @@ async function crawl(run) {
   await explore(root)
   for (const a of starts) {
     if (states.length >= MAX_) break
-    if (!(await goBackTo(root))) await restore([])
-    await doAction(a)
-    const snap = await collect()
+    try {
+      if (!(await goBackTo(root))) await restore([])
+      await doAction(a)
+    } catch (e) { console.log(`  ${describe(a)}: ${String(e.message).split('\n')[0]}`); continue }
+    const snap = await collect().catch(() => null)
+    if (!snap) continue
     const fp = fpOf(snap)
     if (byFp.has(fp)) { edges.push({ from: root.id, action: describe(a), to: byFp.get(fp).id }); continue }
     const s = await record(snap, root, a)
