@@ -4,7 +4,8 @@
 # It is safe to run again (it only adds what is missing) and backs up every file it changes
 # to <file>.bak-agent-lead the first time.
 #
-# 1. Installs agent-run, run-agent.sh and the worker rules into ~/.claude/agent-runs/.
+# 1. Installs agent-run, run-agent.sh and the worker rules into ~/.claude/agent-runs/, and the /lead command
+#    into ~/.claude/commands/ (install-lead.sh).
 # 2. Lets Claude Code run them in every project: adds allow rules to ~/.claude/settings.json.
 # 3. For worker CLIs that read their allow list from a file (agy, Cursor Agent), adds the safe
 #    command set to that file. Claude Code, Codex, Gemini CLI, Qwen Code and OpenCode get their
@@ -19,6 +20,7 @@ mkdir -p "$dest"
 cp "$here/agent-run" "$here/run-agent.sh" "$here/worker-rules.md" "$dest/"
 chmod +x "$dest/agent-run" "$dest/run-agent.sh"
 echo "✔ installed agent-run, run-agent.sh and worker-rules.md in $dest"
+bash "$here/install-lead.sh"
 
 # Adds entries to a JSON array at a path in a settings file, creating what is missing.
 add_allow() {

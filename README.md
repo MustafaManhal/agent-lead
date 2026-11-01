@@ -62,7 +62,7 @@ Every later session: run `/lead` again. Pick the workflow (keep the current one 
 
 | Part | What it does |
 | --- | --- |
-| `/lead` command | The only command. Asks which workflow (Handoff or Pane), then starts or resumes the lead workflow in the current project. |
+| `/lead` command | The only command (installed by `install-lead.sh`). Asks which workflow (Handoff or Pane), then starts or resumes the lead workflow in the current project. |
 | `agent-lead` skill | Started by `/lead` (hidden from the slash menu). `SKILL.md` (the procedure) plus `project-setup.md`, `foundation.md`, `research.md`, `playwright.md`, `review.md`, `workflows/handoff.md`, `workflows/pane.md` and `clis.md`. |
 | Templates | The six docs, `LEAD.md`, `WORKER.md`, `brief.md`, `review-round.md`, `status.md`, `decisions.md`, an `AGENTS.md` pointer section, allow lists. |
 | Checklist page | Every project gets one (you are asked once): the plan as a page with overall progress, the next item, milestone cards that fold away when done, Details for long notes, Expand all / Collapse all / Hide done, light and dark, phone-friendly. Published privately with the Artifact tool to one link that stays the same, or kept as a local file. Rebuilt after every checklist change. Built by `plan-page.mjs`. |
@@ -79,11 +79,21 @@ At the prompt of a Claude Code terminal session:
 /plugin install agent-lead --marketplace MustafaManhal/agent-lead
 ```
 
-Answer `y` to add the marketplace, then pick a scope (user scope makes `/lead` available in every project).
+Answer `y` to add the marketplace, then pick a scope (user scope is best).
+
+Then install the `/lead` command once (Claude Code shows plugin commands with the plugin's prefix, so the plugin
+puts a plain `/lead` in your own commands folder, `~/.claude/commands/lead.md`):
+
+```bash
+bash ~/.claude/plugins/marketplaces/agent-lead/skills/agent-lead/install-lead.sh
+```
+
+Run `/reload-plugins`. `/lead` now works in every project.
 From a shell: `claude plugin install agent-lead --marketplace MustafaManhal/agent-lead`. In the desktop app: + next
 to the prompt box, Plugins, Add marketplace `MustafaManhal/agent-lead`, then Add plugin.
 
-Already installed? Update it (`/plugin update agent-lead`, or reinstall), then run `/reload-plugins`.
+Already installed? Update it (`/plugin marketplace update agent-lead`), run `install-lead.sh` again to refresh
+`/lead`, then run `/reload-plugins`.
 
 ### Codex, Gemini CLI, OpenCode, Cursor and other agents
 

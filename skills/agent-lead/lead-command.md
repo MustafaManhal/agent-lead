@@ -3,7 +3,8 @@ description: Lead this project with a worker agent - pick the workflow, then set
 argument-hint: "[goal or note]"
 ---
 
-Use the **agent-lead** skill (read its `SKILL.md` first, then the files it points to as you need them). You are the
+Use the **agent-lead** skill (load it with the Skill tool as `agent-lead:agent-lead`, or read its `SKILL.md`; then
+the files it points to as you need them). You are the
 lead of this project. Arguments from the user: `$ARGUMENTS`
 
 1. **Ask the workflow first, every time.** Before any other work, ask the user which workflow style to use this
