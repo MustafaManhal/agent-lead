@@ -50,6 +50,8 @@
 //                        another holder takes it, releases it at the end
 //   --recycle <n> (6)    move to a fresh tab every n reloads (and whenever a load stalls): reloads reuse the tab's
 //                        process, and heavy apps grow until they hang
+//   --tab-minutes <n> (8) also move to a fresh tab once the tab is n minutes old (memory grows with every click),
+//                        at the next point where the scan goes back to a screen
 //   --parallel           run the plan's runs at the same time, each in its own browser window (about N times
 //                        faster; every run's setup and teardown must leave the other runs' things alone). Not for
 //                        several runs in one shared document of a multiplayer app (Figma): the sessions follow and
@@ -76,7 +78,7 @@ if (indexOnly) args.shift()
 const planFile = o.opt('--plan')
 const PLAN = planFile ? JSON.parse(readFileSync(abs(planFile), 'utf8')) : {}
 // The app address is the first argument that is neither an option nor an option's value.
-const VALUED = new Set(['--recycle', '--lock', '--same', '--out', '--label', '--mode', '--setup', '--entry', '--routes', '--skip', '--max', '--depth', '--per', '--wait', '--load', '--viewport', '--port', '--profile', '--tip', '--allow', '--type', '--color-scheme', '--native', '--teardown', '--ready', '--plan'])
+const VALUED = new Set(['--tab-minutes', '--recycle', '--lock', '--same', '--out', '--label', '--mode', '--setup', '--entry', '--routes', '--skip', '--max', '--depth', '--per', '--wait', '--load', '--viewport', '--port', '--profile', '--tip', '--allow', '--type', '--color-scheme', '--native', '--teardown', '--ready', '--plan'])
 const positional = args.find((a, i) => !a.startsWith('--') && !VALUED.has(args[i - 1]))
 const URL_ = positional ?? PLAN.url ?? cfg.url ?? ref.url
 const host = URL_ ? new URL(URL_).hostname.replace(/^www\./, '') : 'app'
@@ -109,6 +111,7 @@ const SAME = Number(o.opt('--same') ?? cfg.same ?? 3)
 const LOCK = o.opt('--lock') ?? PLAN.lock ?? cfg.lock
 const PARALLEL = o.flag('--parallel') || PLAN.parallel === true
 const RECYCLE = Number(o.opt('--recycle') ?? PLAN.recycle ?? cfg.recycle ?? 6)
+const TAB_MIN = Number(o.opt('--tab-minutes') ?? PLAN.tabMinutes ?? cfg.tabMinutes ?? 8)
 // Routes that create things, belong to the desktop app or internal tools, or change account state: never visited.
 const ROUTE_SKIP = /new|create|try|desktop|preload|test|eval|admin|settings|logout|signout|delete|billing|purchase|upgrade|invite|report|unsubscribe|checkout|jam|import|export|download|install/i
 const DEBUG = o.flag('--debug')
@@ -489,6 +492,7 @@ async function crawl(run) {
   }
   let fresh = !!run.ownWindow
   let reloads = 0
+  let tabSince = Date.now()
   // Open the start page in a new tab (its own process), switch the scan to it and close the old tab.
   const freshTab = async (why) => {
     console.log(`  ${why}: moving to a fresh tab`)
@@ -515,6 +519,7 @@ async function crawl(run) {
     if (!next) return
     next.on('dialog', (d) => (d.type() === 'beforeunload' ? d.accept() : d.dismiss()).catch(() => {}))
     page = next
+    tabSince = Date.now()
     if (run.ownWindow) run.targetId = targetId
     const c2 = await context.newCDPSession(page).catch(() => null)
     await c2?.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {})
@@ -562,6 +567,17 @@ async function crawl(run) {
   }
   const goBackTo = async (state) => {
     dbg('back to', state.id)
+    // An old tab has grown (memory, CPU): go back to this state in a fresh one.
+    if (Date.now() - tabSince > TAB_MIN * 60000 && !page.isClosed()) {
+      await freshTab(`tab is ${Math.round((Date.now() - tabSince) / 60000)} min old`)
+      if (READY) await page.waitForFunction(READY, null, { timeout: 90000, polling: 500 }).catch(() => {})
+      await settle(WAIT * 3)
+      await runSetup()
+      await settle()
+      for (const a of state.path) await doAction(a).catch(() => {})
+      const snap0 = await collect(true).catch(() => null)
+      if (snap0 && sameAs(snap0, state)) return true
+    }
     // Clear text a search step typed.
     await page.evaluate(() => { const el = document.activeElement; if (el && 'value' in el && el.value) { const set = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value')?.set; set?.call(el, ''); el.dispatchEvent(new Event('input', { bubbles: true })) } }).catch(() => {})
     for (let i = 0; i < 3 && !page.isClosed(); i++) {
