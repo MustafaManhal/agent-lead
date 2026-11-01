@@ -189,7 +189,7 @@ async function main() {
     const concrete = routes.filter((r) => r.startsWith('/') && r !== '/' && !/[$:{}*]/.test(r) && !SKIP.test(r) && !ROUTE_SKIP.test(r))
     if (VISIT_ROUTES && concrete.length) {
       writeFileSync(join(OUT, 'routes.txt'), concrete.join('\n') + '\n')
-      await crawl({ label: 'routes', url: new URL(concrete[0], new URL(URL_).origin).href, setup: null, entries: concrete.map((r) => `route:${r}`), mode: 'safe', max: Math.max(MAX, concrete.length + 20), depth: 1, per: 12 })
+      await crawl({ label: 'routes', url: new URL(concrete[0], new URL(URL_).origin).href, ready: null, setup: null, entries: concrete.map((r) => `route:${r}`), mode: 'safe', max: Math.max(MAX, concrete.length + 20), depth: 1, per: 12 })
     }
   }
   if (sharedBrowser) await (await sharedBrowser).close().catch(() => {}) // disconnects; the user's browser stays open
@@ -292,6 +292,8 @@ async function crawl(run) {
   const { label, mode: MODE_, max: MAX_, depth: DEPTH_, per: PER_ } = run
   // A run can start somewhere else than the plan's url (the routes run starts on a plain page, not the editor).
   const START = run.url ?? URL_
+  // The ready check belongs to the start page (an editor's API); a run that starts elsewhere (routes) has its own.
+  const RDY = 'ready' in run ? run.ready : READY
   const RUN = join(OUT, 'runs', label)
   console.log(`\n── run ${label} ──`)
   if (!URL_) {
@@ -583,7 +585,7 @@ async function crawl(run) {
     if (fresh) {
       fresh = false
       await page.waitForLoadState('domcontentloaded', { timeout: 90000 }).catch(() => {})
-      if (!READY || (await page.waitForFunction(READY, null, { timeout: 90000, polling: 500 }).then(() => true, () => false))) {
+      if (!RDY || (await page.waitForFunction(RDY, null, { timeout: 90000, polling: 500 }).then(() => true, () => false))) {
         await settle(WAIT * 3)
         await runSetup()
         await settle()
@@ -605,11 +607,11 @@ async function crawl(run) {
       await (samePage ? page.reload({ timeout: 90000, waitUntil: 'domcontentloaded' }) : page.goto(START, { timeout: 90000, waitUntil: 'domcontentloaded' })).catch((e) => console.log(`  reload: ${String(e.message).split('\n')[0]}`))
     }
     await page.bringToFront().catch(() => {})
-    for (let tries = 0; READY && tries < 3; tries++) {
-      if (await page.waitForFunction(READY, null, { timeout: 60000, polling: 500 }).then(() => true, () => false)) break
+    for (let tries = 0; RDY && tries < 3; tries++) {
+      if (await page.waitForFunction(RDY, null, { timeout: 60000, polling: 500 }).then(() => true, () => false)) break
       await freshTab('not ready after loading')
     }
-    await settle(READY ? WAIT * 3 : LOAD)
+    await settle(RDY ? WAIT * 3 : LOAD)
     await runSetup()
     await settle()
     await replay(path)
@@ -619,7 +621,7 @@ async function crawl(run) {
     // An old tab has grown (memory, CPU): go back to this state in a fresh one.
     if (Date.now() - tabSince > TAB_MIN * 60000 && !page.isClosed()) {
       await freshTab(`tab is ${Math.round((Date.now() - tabSince) / 60000)} min old`)
-      if (READY) await page.waitForFunction(READY, null, { timeout: 90000, polling: 500 }).catch(() => {})
+      if (RDY) await page.waitForFunction(RDY, null, { timeout: 90000, polling: 500 }).catch(() => {})
       await settle(WAIT * 3)
       await runSetup()
       await settle()
