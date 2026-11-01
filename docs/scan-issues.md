@@ -16,6 +16,7 @@ Evidence: the Figma runs of 2026-11-01 (logs in figmu `figma-research/scan/*.log
 | 10 | Start screen differs after a reload | Figma remembers the current page, zoom, open left panel, selection, Find bar | setups reset page, zoom, panel and selection (Figma plan); the start screen matches at 80% | fixed 0.10.0 |
 | 11 | Lists with live content differ (libraries, community, variables) | content loads late or changes | near-duplicate match (Yandrapally et al., ICSE 2020): 80% of the state's own controls and 70% of everything | fixed 0.10.0 |
 | 12 | Same menus explored again in every run | each run starts from scratch | per-run skip lists (plans) | fixed 0.8.x |
+| 14 | Many reloads to go back | Escape cannot undo a tab switch, an opened side panel or a document change | select the state's tab/panel again, then undo (--undo) before reloading; fresh tabs come to the front at once | fixed 0.10.1 |
 | 13 | Slow on heavy pages | fixed waits, full style reads for every check | quick checks, adaptive waits, direct screenshots | fixed 0.9.0 |
 
 Test after the open fixes: the fixture page (all states, under 40 s) with volatile names and a remembered panel added to

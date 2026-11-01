@@ -50,6 +50,8 @@
 //                        another holder takes it, releases it at the end
 //   --recycle <n> (6)    move to a fresh tab every n reloads (and whenever a load stalls): reloads reuse the tab's
 //                        process, and heavy apps grow until they hang
+//   --undo <keys>        the app's undo shortcut (e.g. Meta+z): after an allowed action changed the document, going
+//                        back tries undo before reloading
 //   --tab-minutes <n> (8) also move to a fresh tab once the tab is n minutes old (memory grows with every click),
 //                        at the next point where the scan goes back to a screen
 //   --parallel           run the plan's runs at the same time, each in its own browser window (about N times
@@ -68,6 +70,7 @@ import { join } from 'node:path'
 import { abs, config, load, options, toolsDir } from './lib.mjs'
 import { connect, serverFromClaude } from './mcp-client.mjs'
 import { execFileSync } from 'node:child_process'
+import { bk, candidates as selectCandidates, ck, keysOf, norm, sameAs as matchesState } from './scan-core.mjs'
 
 const args = process.argv.slice(2)
 const o = options(args)
@@ -78,7 +81,7 @@ if (indexOnly) args.shift()
 const planFile = o.opt('--plan')
 const PLAN = planFile ? JSON.parse(readFileSync(abs(planFile), 'utf8')) : {}
 // The app address is the first argument that is neither an option nor an option's value.
-const VALUED = new Set(['--tab-minutes', '--recycle', '--lock', '--same', '--out', '--label', '--mode', '--setup', '--entry', '--routes', '--skip', '--max', '--depth', '--per', '--wait', '--load', '--viewport', '--port', '--profile', '--tip', '--allow', '--type', '--color-scheme', '--native', '--teardown', '--ready', '--plan'])
+const VALUED = new Set(['--undo', '--tab-minutes', '--recycle', '--lock', '--same', '--out', '--label', '--mode', '--setup', '--entry', '--routes', '--skip', '--max', '--depth', '--per', '--wait', '--load', '--viewport', '--port', '--profile', '--tip', '--allow', '--type', '--color-scheme', '--native', '--teardown', '--ready', '--plan'])
 const positional = args.find((a, i) => !a.startsWith('--') && !VALUED.has(args[i - 1]))
 const URL_ = positional ?? PLAN.url ?? cfg.url ?? ref.url
 const host = URL_ ? new URL(URL_).hostname.replace(/^www\./, '') : 'app'
@@ -111,6 +114,7 @@ const SAME = Number(o.opt('--same') ?? cfg.same ?? 3)
 const LOCK = o.opt('--lock') ?? PLAN.lock ?? cfg.lock
 const PARALLEL = o.flag('--parallel') || PLAN.parallel === true
 const RECYCLE = Number(o.opt('--recycle') ?? PLAN.recycle ?? cfg.recycle ?? 6)
+const UNDO = o.opt('--undo') ?? PLAN.undo ?? cfg.undo
 const TAB_MIN = Number(o.opt('--tab-minutes') ?? PLAN.tabMinutes ?? cfg.tabMinutes ?? 8)
 // Routes that create things, belong to the desktop app or internal tools, or change account state: never visited.
 const ROUTE_SKIP = /new|create|try|desktop|preload|test|eval|admin|settings|logout|signout|delete|billing|purchase|upgrade|invite|report|unsubscribe|checkout|jam|import|export|download|install/i
@@ -141,12 +145,7 @@ const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const json = (v) => JSON.stringify(v, null, 1)
 
-// Screen comparison (after Crawljax's comparators and near-duplicate detection, Yandrapally et al. ICSE 2020):
-// parts that change by themselves are stripped before comparing: numbers (zoom "100%", counts), hex colors, case
-// and spacing. A control's key is its role plus that normalized name.
-const norm = (name = '') => name.toLowerCase().replace(/#?[0-9a-f]{6}\b/g, '#hex').replace(/\d+([.,:]\d+)*/g, '#').replace(/\s+/g, ' ').trim()
-const ck = (c) => `${c.role}|${norm(c.name)}`
-const bk = (c) => `[${c.role}]${norm(c.name)}`
+// Screen comparison helpers live in scan-core.mjs so the normalization and selection rules can be tested alone.
 
 // Tooltips and hover looks already recorded in this scan (the same toolbar shows in every run).
 const hoverSeen = new Map()
@@ -315,22 +314,32 @@ async function crawl(run) {
     // Parallel runs: a window of its own (a background tab is throttled), registered so no other run closes it.
     // Find the page by the id Chrome gives the new window: no guessing between runs opening windows at once.
     pendingWindows++
-    windowSession ??= browser.newBrowserCDPSession()
-    const bs = await windowSession
-    const { targetId } = await bs.send('Target.createTarget', { url: START, newWindow: true })
-    run.targetId = targetId
-    for (let i = 0; i < 100 && !page; i++) {
-      for (const p of browser.contexts().flatMap((c) => c.pages())) {
-        if (scanPages.has(p)) continue
-        const s2 = await p.context().newCDPSession(p).catch(() => null)
-        const info = await s2?.send('Target.getTargetInfo').catch(() => null)
-        await s2?.detach().catch(() => {})
-        if (info?.targetInfo?.targetId === targetId) { page = p; break }
+    let targetId
+    try {
+      windowSession ??= browser.newBrowserCDPSession()
+      const bs = await windowSession
+      ;({ targetId } = await bs.send('Target.createTarget', { url: START, newWindow: true }))
+      run.targetId = targetId
+      for (let i = 0; i < 100 && !page; i++) {
+        for (const p of browser.contexts().flatMap((c) => c.pages())) {
+          if (scanPages.has(p)) continue
+          const s2 = await p.context().newCDPSession(p).catch(() => null)
+          const info = await s2?.send('Target.getTargetInfo').catch(() => null)
+          await s2?.detach().catch(() => {})
+          if (info?.targetInfo?.targetId === targetId) { page = p; break }
+        }
+        if (!page) await sleep(100)
       }
-      if (!page) await sleep(100)
+    } catch (e) {
+      if (targetId) await (await windowSession).send('Target.closeTarget', { targetId }).catch(() => {})
+      throw e
+    } finally {
+      pendingWindows--
     }
-    pendingWindows--
-    if (!page) throw new Error(`run ${label}: no window opened`)
+    if (!page) {
+      if (targetId) await (await windowSession).send('Target.closeTarget', { targetId }).catch(() => {})
+      throw new Error(`run ${label}: no window opened`)
+    }
   } else {
     page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(origin) && new URL(p.url()).pathname === startPath && !scanPages.has(p)) ?? null
     page ??= browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(origin) && !scanPages.has(p)) ?? null
@@ -387,11 +396,6 @@ async function crawl(run) {
     }
     throw new Error('the page did not answer (navigating?)')
   }
-  const keysOf = (snap) =>
-    new Set([
-      ...snap.controls.filter((c) => !['textbox', 'searchbox', 'spinbutton', 'slider'].includes(c.role)).map(ck),
-      ...snap.containers.filter((c) => c.role !== 'tooltip').map(bk),
-    ])
   // What a state adds to its parent: the same menu or dialog opened from another screen is the same thing.
   const addedFpOf = (snap, parentSnap) => {
     const pk = keysOf(parentSnap)
@@ -403,17 +407,7 @@ async function crawl(run) {
   // The same screen as a state (near-duplicate, not only identical): same page, 80% of the controls the state itself
   // added (a menu's items, a dialog's fields) back on screen, and 70% of everything alike; the start screen needs 80%
   // of everything. Late-loading lists, an extra bar or a changed count no longer break the match.
-  const sameAs = (snap, state) => {
-    if (fpOf(snap) === state.fp) return true
-    if (new URL(snap.url).pathname !== new URL(state.url).pathname) return false
-    const a = keysOf(snap)
-    const b = keysOf(state.snap)
-    const both = [...b].filter((k) => a.has(k)).length
-    const jaccard = both / (a.size + b.size - both || 1)
-    if (!state.ownKeys?.length) return jaccard >= 0.8
-    const own = state.ownKeys.filter((k) => a.has(k)).length / state.ownKeys.length
-    return own >= 0.8 && jaccard >= 0.7
-  }
+  const sameAs = matchesState
   const fpOf = (snap) => createHash('sha1').update(new URL(snap.url).pathname + '\n' + [...keysOf(snap)].sort().join('\n')).digest('hex').slice(0, 10)
   // Wait until the page stops changing, at most `ms` (the old fixed wait); without the helper (a new page), sleep.
   let lastUrl = ''
@@ -530,6 +524,7 @@ async function crawl(run) {
   }
   let fresh = !!run.ownWindow
   let reloads = 0
+  let changedDoc = 0 // allowed actions done since the last reload (things undo can take back)
   let tabSince = Date.now()
   // Open the start page in a new tab (its own process), switch the scan to it and close the old tab.
   const freshTab = async (why) => {
@@ -540,24 +535,36 @@ async function crawl(run) {
     let oldId = null
     try { const s0 = await context.newCDPSession(old); oldId = (await s0.send('Target.getTargetInfo')).targetInfo.targetId; await s0.detach() } catch {}
     pendingWindows++
-    const { targetId } = await bs.send('Target.createTarget', { url: START, newWindow: false })
+    let targetId
     let next = null
-    for (let i = 0; i < 100 && !next; i++) {
-      for (const p of context.pages()) {
-        if (scanPages.has(p)) continue
-        const s2 = await context.newCDPSession(p).catch(() => null)
-        const info = await s2?.send('Target.getTargetInfo').catch(() => null)
-        await s2?.detach().catch(() => {})
-        if (info?.targetInfo?.targetId === targetId) { next = p; break }
+    try {
+      ;({ targetId } = await bs.send('Target.createTarget', { url: START, newWindow: false }))
+      for (let i = 0; i < 100 && !next; i++) {
+        for (const p of context.pages()) {
+          if (scanPages.has(p)) continue
+          const s2 = await context.newCDPSession(p).catch(() => null)
+          const info = await s2?.send('Target.getTargetInfo').catch(() => null)
+          await s2?.detach().catch(() => {})
+          if (info?.targetInfo?.targetId === targetId) { next = p; break }
+        }
+        if (!next) await sleep(100)
       }
-      if (!next) await sleep(100)
+    } catch (e) {
+      if (targetId) await bs.send('Target.closeTarget', { targetId }).catch(() => {})
+      throw e
+    } finally {
+      pendingWindows--
     }
     if (next) scanPages.add(next)
-    pendingWindows--
-    if (!next) return
+    if (!next) {
+      if (targetId) await bs.send('Target.closeTarget', { targetId }).catch(() => {})
+      throw new Error('fresh tab did not open')
+    }
     next.on('dialog', (d) => (d.type() === 'beforeunload' ? d.accept() : d.dismiss()).catch(() => {}))
     page = next
     tabSince = Date.now()
+    // In front at once: heavy apps load slowly, or never, in a tab that is not shown.
+    await page.bringToFront().catch(() => {})
     if (run.ownWindow) run.targetId = targetId
     const c2 = await context.newCDPSession(page).catch(() => null)
     await c2?.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {})
@@ -588,6 +595,7 @@ async function crawl(run) {
     // (Figma: 2.4 GB at 100% CPU, stuck on its loading bar). Every RECYCLE reloads, and whenever a load does not
     // become ready, the scan moves to a fresh tab (a new process) and closes the old one.
     reloads++
+    changedDoc = 0
     if (reloads % RECYCLE === 0) await freshTab('recycling the tab')
     else {
       const samePage = (() => { try { return new URL(page.url()).pathname === new URL(START).pathname } catch { return false } })()
@@ -625,6 +633,28 @@ async function crawl(run) {
       else await page.keyboard.press('Escape').catch(() => {})
       await settle().catch(() => {})
     }
+    // Before reloading: take back what Escape cannot. Select again the tab or panel the state had selected, and
+    // undo document changes the scan made (only with --undo).
+    const on = (c) => c.state?.selected || c.state?.expanded || c.state?.pressed || c.state?.checked
+    for (let i = 0; i < 3 && !page.isClosed(); i++) {
+      const cur = await collect(true).catch(() => null)
+      if (!cur) break
+      if (sameAs(cur, state)) return true
+      const want = state.snap.controls.find((c) => on(c) && ['tab', 'button', 'radio', 'treeitem'].includes(c.role) && !SKIP.test(c.name) && cur.controls.some((x) => x.role === c.role && x.name === c.name && !on(x)))
+      if (!want) break
+      const now = cur.controls.find((x) => x.role === want.role && x.name === want.name && !on(x))
+      dbg('reselect', want.role, want.name)
+      await doAction({ kind: 'click', role: now.role, name: now.name, x: Math.round(now.x + now.w / 2), y: Math.round(now.y + now.h / 2) }).catch(() => {})
+    }
+    for (let i = 0; UNDO && changedDoc > 0 && i < 3 && !page.isClosed(); i++) {
+      await page.keyboard.press(UNDO).catch(() => {})
+      changedDoc--
+      await settle()
+      const cur = await collect(true).catch(() => null)
+      if (cur && sameAs(cur, state)) return true
+    }
+    const after = await collect(true).catch(() => null)
+    if (after && sameAs(after, state)) return true
     await restore(state.path).catch((e) => console.log(`  restore: ${String(e.message).split('\n')[0]}`))
     const snap = await collect(true).catch(() => null)
     if (snap && sameAs(snap, state)) return true
@@ -652,32 +682,7 @@ async function crawl(run) {
   }
 
   const searched = new Set()
-  const candidates = (snap, parentKeys) => {
-    const out = []
-    for (const c of snap.controls) {
-      if (out.length >= PER_) break
-      if (!c.name && c.role !== 'combobox') continue
-      if (SKIP.test(c.name) || runSkip?.test(c.name) || c.state?.disabled) continue
-      if (typeText && ['searchbox', 'textbox', 'combobox'].includes(c.role) && (c.role === 'searchbox' || /search|find|filter/i.test(c.name))) {
-        if (searched.has(c.name) || c.state?.value) continue
-        searched.add(c.name)
-        out.push({ role: c.role, name: c.name, x: Math.round(c.x + c.w / 2), y: Math.round(c.y + c.h / 2), kind: 'search', text: typeText })
-        continue
-      }
-      const popup = c.state?.haspopup || c.state?.expanded
-      const cx = Math.round(c.x + c.w / 2)
-      const cy = Math.round(c.y + c.h / 2)
-      const base = { role: c.role, name: c.name, x: cx, y: cy, popup: !!popup }
-      if (['menuitem', 'menuitemcheckbox', 'menuitemradio'].includes(c.role)) { if (popup || MODE_ !== 'safe') out.push({ ...base, kind: 'hover' }) }
-      else if (c.role === 'tab' && !c.state?.selected) out.push({ ...base, kind: 'click' })
-      else if (c.role === 'combobox' || popup) out.push({ ...base, kind: 'click' })
-      else if (c.role === 'link' && c.state?.href?.startsWith('/') && c.state.href !== new URL(snap.url).pathname) out.push({ ...base, kind: 'click' })
-      else if (MODE_ === 'full' && ['button', 'treeitem'].includes(c.role) && (!ACTION.test(c.name) || allowRe?.test(c.name)) && !c.state?.pressed && !c.state?.checked) out.push({ ...base, kind: 'click' })
-      else if (MODE_ === 'wide' && ['button', 'clickable', 'treeitem'].includes(c.role)) out.push({ ...base, kind: 'click' })
-    }
-    // Controls new in this state first: they belong to what just opened.
-    return out.sort((a, b) => Number(parentKeys.has(ck(a))) - Number(parentKeys.has(ck(b))))
-  }
+  const candidates = (snap, parentKeys) => selectCandidates(snap, parentKeys, { per: PER_, mode: MODE_, skip: SKIP, runSkip, action: ACTION, allowRe, typeText, searched })
 
   const record = async (snap, parent, via) => {
     const fp = fpOf(snap)
@@ -865,6 +870,7 @@ async function crawl(run) {
         const ready = sameAs(cur, state) || (c.kind === 'hover' && visible && [...stateKeys].every((k) => curKeys.has(k)) && [...curKeys].filter((k) => !stateKeys.has(k)).every((k) => k.startsWith('menuitem') || k.startsWith('[menu]')))
         if (!ready && !(await goBackTo(state))) { console.log(`  could not return to ${state.id}; skipping the rest of it`); return }
         await doAction(c)
+        if (allowRe?.test(c.name) || (MODE_ === 'wide' && ACTION.test(c.name))) changedDoc++
         // A quick look decides; the full read (styles, regions, texts) only for a new state.
         const snap = await collect(true)
         if (c.kind === 'search') { /* results captured below; the box is cleared on the way back */ }
