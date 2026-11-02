@@ -7,9 +7,11 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
+import { startPipeBrowser } from '../../skills/agent-lead/tools/browser-pipe.mjs'
+import { automationBrowser } from '../../skills/agent-lead/tools/browser-background.mjs'
 
 const repo = fileURLToPath(new URL('../..', import.meta.url))
-const playwrightRequire = createRequire('/Users/mustafamanhal/emdash/worktrees/figmu-1c7144a2/emdash-worker-i9g93/package.json')
+const playwrightRequire = createRequire(join(process.env.AGENT_LEAD_PLAYWRIGHT_ROOT || repo, 'package.json'))
 const { chromium } = playwrightRequire('playwright')
 const fixture = `<!doctype html><html><head><title>Scan fixture</title><style>
 body{font:15px sans-serif;margin:24px;color:#222}button,a,input{margin:5px;padding:9px}#menu,#submenu{display:none;position:absolute;background:white;border:1px solid #aaa;padding:8px}#menu.open,#submenu.open{display:block}#submenu{left:115px;top:44px}.scroll{height:100px;width:300px;overflow-y:auto;border:1px solid #888}.row{height:42px}.icon{width:24px;height:24px}.tip{display:none;position:absolute;background:#111;color:white;padding:6px}.icon-wrap:hover .tip{display:block}dialog[open]{border:1px solid #444}
@@ -45,9 +47,10 @@ test('scan crawls local fixture safely and recognizes start screen after volatil
     res.writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' }); res.end(fixture.replaceAll('__ZOOM__', String(loads * 10)))
   })
   await new Promise((resolve) => server.listen(9556, '127.0.0.1', resolve))
-  let browser
+  let browser, driver
   try {
-    browser = await chromium.launch({ headless: true, args: ['--remote-debugging-port=9555', '--remote-allow-origins=*'] })
+    driver = await startPipeBrowser({ executable: automationBrowser(chromium.executablePath()), profile: join(dir, 'profile'), port: 9555 })
+    browser = await chromium.connectOverCDP(driver.endpoint)
     const page = await browser.newPage()
     await page.goto('http://127.0.0.1:9556/')
     const env = { ...process.env, NODE_PATH: dirname(dirname(playwrightRequire.resolve('playwright'))) }
@@ -85,7 +88,7 @@ test('scan crawls local fixture safely and recognizes start screen after volatil
     assert.equal(deletes, 0, 'Delete button must never be activated')
     assert.doesNotMatch(stdout, /could not return to 000/)
   } finally {
-    await browser?.close().catch(() => {})
+    await browser?.close().catch(() => {}); await driver?.close()
     await new Promise((resolve) => server.close(resolve))
     await rm(dir, { recursive: true, force: true })
   }
@@ -101,9 +104,10 @@ test('parallel scan keeps successful output when a sibling run fails and closes 
     res.end(fixture.replaceAll('__ZOOM__', String(loads * 10)))
   })
   await new Promise((resolve) => server.listen(9556, '127.0.0.1', resolve))
-  let browser
+  let browser, driver
   try {
-    browser = await chromium.launch({ headless: true, args: ['--remote-debugging-port=9555', '--remote-allow-origins=*'] })
+    driver = await startPipeBrowser({ executable: automationBrowser(chromium.executablePath()), profile: join(dir, 'profile'), port: 9555 })
+    browser = await chromium.connectOverCDP(driver.endpoint)
     const page = await browser.newPage()
     await page.goto('http://127.0.0.1:9556/')
     const out = join(dir, 'out')
@@ -135,7 +139,7 @@ test('parallel scan keeps successful output when a sibling run fails and closes 
     assert.ok(loads >= 1)
     void page
   } finally {
-    await browser?.close().catch(() => {})
+    await browser?.close().catch(() => {}); await driver?.close()
     await new Promise((resolve) => server.close(resolve))
     await rm(dir, { recursive: true, force: true })
   }

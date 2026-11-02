@@ -101,6 +101,7 @@ export const abs = (p) => (path.isAbsolute(p) ? p : path.join(root, p))
 
 /** Import a package the way the project would (its node_modules), e.g. load('playwright'). */
 export async function load(name) {
+  if (name === 'playwright') return (await import('./browser-background.mjs')).loadPlaywright()
   for (const base of [root, toolsDir]) {
     try {
       const resolved = createRequire(path.join(base, 'package.json')).resolve(name)

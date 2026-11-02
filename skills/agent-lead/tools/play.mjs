@@ -13,7 +13,7 @@
 //   ui[:text]              named controls as text (cheaper than a screenshot), optionally filtered
 //   shot:<file.png>[,x,y,w,h]
 // Page errors are printed at the end. Playwright must be installed in the project (npm i -D playwright).
-import { backgroundArgs, keepPageActive, launchBackgroundSession } from './browser-background.mjs'
+import { backgroundArgs, keepPageActive, launchBackgroundSession, pressKey } from './browser-background.mjs'
 import { readFileSync } from 'node:fs'
 import { config, load, options } from './lib.mjs'
 
@@ -81,7 +81,7 @@ for (const step of steps) {
         await page.mouse.move(x2, y2, { steps: 12 })
         await page.mouse.up()
       })
-    } else if (kind === 'key') await page.keyboard.press(rest)
+    } else if (kind === 'key') await pressKey(page, rest)
     else if (kind === 'type') await page.keyboard.type(rest)
     else if (kind === 'wait') await page.waitForTimeout(Number(rest))
     else if (kind === 'tap') await byRole(rest).click({ timeout: 8000 })

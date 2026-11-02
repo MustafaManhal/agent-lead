@@ -64,7 +64,7 @@
 // Safety: it never types, never clicks names matching the destructive list (delete, share, publish, pay, sign
 // out, …), closes any tab the app opens, dismisses browser dialogs and stays on the app's origin. Use a scratch
 // document or test account. The user signs in by hand in the observe browser (`observe.mjs start`).
-import { keepPageActive, newBackgroundPage } from './browser-background.mjs'
+import { keepPageActive, newBackgroundPage, requirePipeEndpoint, pressKey } from './browser-background.mjs'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -124,7 +124,7 @@ const DEBUG = o.flag('--debug')
 const T0 = Date.now()
 const dbg = (...m) => DEBUG && console.log(`  [${((Date.now() - T0) / 1000).toFixed(1)}s]`, ...m)
 const ARIA = o.flag('--aria') || cfg.aria
-const PORT = Number(o.opt('--port') ?? ref.port ?? 9333)
+const PORT = Number(o.opt('--port') ?? ref.port ?? 9343)
 o.opt('--profile')
 const SKIP = new RegExp(
   [
@@ -143,7 +143,7 @@ const SKIP = new RegExp(
 
 // Plain buttons with these words do something to the document or account instead of showing a screen.
 const ACTION = /\b(add|new|create|insert|duplicate|copy|paste|cut|rename|move|group|ungroup|frame selection|flatten|outline|boolean|union|subtract|intersect|exclude|flip|rotate|align|distribute|tidy|lock|unlock|hide|show|minimi[sz]e|maximi[sz]e|detach|reset|apply|run|play|start|stop|close|undo|redo|zoom (in|out|to)|clear|save|import|export|upload|download|install|enable|disable|toggle|swap|replace|convert|wrap|remove|use|set as|make|bring|send|mark|pin|unpin|follow|unfollow|like|star|favorite|resize|fit|expand all|collapse all|select all|deselect|refresh|reload|retry|sync|generate|restore|go to)\b/i
-const ENDPOINT = `http://127.0.0.1:${PORT}`
+let ENDPOINT = `http://127.0.0.1:${PORT}`
 const short = (s, n = 60) => (s.length > n ? s.slice(0, n - 1) + '…' : s)
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'state'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -320,6 +320,7 @@ async function crawl(run) {
     console.error(`No browser on ${ENDPOINT}. Start it with: node ${join(toolsDir, 'observe.mjs')} start --url ${URL_}`)
     process.exit(1)
   }
+  ENDPOINT = await requirePipeEndpoint(ENDPOINT)
   // One connection for every run, so parallel runs see the same page objects.
   sharedBrowser ??= chromium.connectOverCDP(ENDPOINT, { timeout: 20000 })
   const browser = await sharedBrowser
@@ -488,7 +489,7 @@ async function crawl(run) {
     } else if (a.kind === 'click') await page.mouse.click(a.x, a.y)
     else if (a.kind === 'right') await page.mouse.click(a.x, a.y, { button: 'right' })
     else if (a.kind === 'hover') { await page.mouse.move(a.x - 3, a.y); await page.mouse.move(a.x, a.y) }
-    else if (a.kind === 'key') await page.keyboard.press(a.key)
+    else if (a.kind === 'key') await pressKey(page, a.key)
     else if (a.kind === 'route') await page.goto(new URL(a.route, origin).href)
     for (const m of [...mods].reverse()) await page.keyboard.up(m)
     // Motion: three frames while whatever this opens is appearing.
@@ -533,7 +534,7 @@ async function crawl(run) {
         return true
       }
       if (snap && new URL(snap.url).pathname !== new URL(states[0].url).pathname) return false
-      await page.keyboard.press('Escape')
+      await pressKey(page, 'Escape')
       await settle()
     }
     return false
@@ -643,7 +644,7 @@ async function crawl(run) {
       const snap = await collect(true).catch(() => null)
       if (snap && sameAs(snap, state)) return true
       if (snap && new URL(snap.url).pathname !== new URL(state.url).pathname) await page.goBack({ waitUntil: 'commit', timeout: 5000 }).catch(() => {})
-      else await page.keyboard.press('Escape').catch(() => {})
+      else await pressKey(page, 'Escape').catch(() => {})
       await settle().catch(() => {})
     }
     // Before reloading: take back what Escape cannot. Select again the tab or panel the state had selected, and
@@ -660,7 +661,7 @@ async function crawl(run) {
       await doAction({ kind: 'click', role: now.role, name: now.name, x: Math.round(now.x + now.w / 2), y: Math.round(now.y + now.h / 2) }).catch(() => {})
     }
     for (let i = 0; RUN_UNDO && changedDoc > 0 && i < 3 && !page.isClosed(); i++) {
-      await page.keyboard.press(RUN_UNDO).catch(() => {})
+      await pressKey(page, RUN_UNDO).catch(() => {})
       changedDoc--
       await settle()
       const cur = await collect(true).catch(() => null)
@@ -828,7 +829,7 @@ async function crawl(run) {
       }
       await page.mouse.move(snap.viewport[0] - 2, snap.viewport[1] - 2)
       await sleep(150)
-      if (n && fpOf(await collect(true)) !== fp0) await page.keyboard.press('Escape')
+      if (n && fpOf(await collect(true)) !== fp0) await pressKey(page, 'Escape')
     }
     const line = (c) => `${c.role} "${c.name}" @${c.x},${c.y} ${c.w}x${c.h}${c.state ? ' ' + Object.entries(c.state).map(([k, v]) => (v === 'true' ? k : `${k}=${v}`)).join(' ') : ''}${c.tip ? ` tip="${c.tip}"` : ''}${c.hover?.bg ? ` hover-bg=${c.hover.bg}` : ''}${c.scrolled ? ' (scrolled into view)' : ''}`
     writeFileSync(

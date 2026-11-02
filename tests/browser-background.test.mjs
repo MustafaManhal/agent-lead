@@ -5,7 +5,7 @@ import { createServer } from 'node:http'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { keepPageActive, newBackgroundPage } from '../skills/agent-lead/tools/browser-background.mjs'
+import { keepPageActive, newBackgroundPage, automationBrowser } from '../skills/agent-lead/tools/browser-background.mjs'
 
 const require = createRequire(join(process.env.AGENT_LEAD_PLAYWRIGHT_ROOT || process.cwd(), 'package.json'))
 const { chromium } = require('playwright')
@@ -17,7 +17,7 @@ test('background pages retain context, keyboard, pointer, animation, screenshots
   })
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   const url = `http://127.0.0.1:${server.address().port}`
-  const browser = await chromium.launch()
+  const browser = await chromium.launch({ executablePath: automationBrowser(chromium.executablePath()) })
   const dir = await mkdtemp(join(tmpdir(), 'background-browser-'))
   try {
     const context = await browser.newContext()
@@ -53,7 +53,7 @@ test('background pages retain context, keyboard, pointer, animation, screenshots
 })
 
 test('failed background navigation closes only its owned tab', async () => {
-  const browser = await chromium.launch()
+  const browser = await chromium.launch({ executablePath: automationBrowser(chromium.executablePath()) })
   try {
     const context = await browser.newContext()
     const anchor = await context.newPage()

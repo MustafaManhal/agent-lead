@@ -1,8 +1,10 @@
 {
   "name": "agent-lead",
-  "version": "0.11.2",
+  "version": "0.12.0",
   "description": "Lead a project with a worker agent: start with the Lead skill, review reports, and inspect runs with Agent.",
-  "author": { "name": "Mustafa Manhal" },
+  "author": {
+    "name": "Mustafa Manhal"
+  },
   "license": "MIT",
   "skills": "./skills/",
   "hooks": "./hooks/codex.json",
@@ -11,6 +13,8 @@
     "shortDescription": "Lead worker agents, review changes, and track runs"
   },
   "extensions": {
-    "com.openai": { "onboardingSkill": "./skills/lead/SKILL.md" }
+    "com.openai": {
+      "onboardingSkill": "./skills/lead/SKILL.md"
+    }
   }
 }

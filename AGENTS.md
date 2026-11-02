@@ -23,7 +23,7 @@ Codex uses a terminal viewer in place of a custom side pane and a separate log u
 
 Validate changes with `node --test tests/codex.test.mjs tests/scan/core.test.mjs tests/scan/mcp-client.test.mjs`
 and `claude plugin validate .`. For browser changes, also run
-`AGENT_LEAD_PLAYWRIGHT_ROOT=<project-with-playwright> node --test tests/browser-background.test.mjs tests/scan/fixture.test.mjs`
+`AGENT_LEAD_PLAYWRIGHT_ROOT=<project-with-playwright> node --test tests/browser-background.test.mjs tests/browser-pipe.test.mjs tests/scan/fixture.test.mjs`
 (the local scan fixture currently uses the Figmu test environment). `tests/codex.test.mjs` uses temporary runtime/skill directories and fake workers;
 it never starts a paid agent or changes the user's config. Test plugin discovery with `codex plugin list --available --json`.
 
@@ -121,3 +121,6 @@ Denials: any error text matching `denied|not allowed|permission|rejected|decline
 - No `.env.local` in the worktree; features that need server keys differ there. Check them in the main checkout after merging.
 - Claude Code's auto mode may refuse to launch a worker or to edit a worker's settings until the user allows it; explain and let the user decide.
 - Some CLIs read stdin and wait; the wrapper closes stdin for them.
+
+Browser policy: automatic macOS runs use the windowless pipe endpoint and `pressKey` for clipboard shortcuts.
+Only explicit manual login opens a browser application. Keep helper copies and the driver/browser versions matched.

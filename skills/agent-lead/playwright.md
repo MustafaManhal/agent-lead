@@ -64,8 +64,9 @@ serious issues when the project targets accessibility.
 ## Research on other sites
 
 - `chromium.launch()` with a fresh context, no stored logins. Never type the user's passwords.
-- To inspect a browser the user already signed into (only when they ask): start it with a remote debugging port and
-  `chromium.connectOverCDP('http://127.0.0.1:<port>')`, read only, and do not change their data.
+- On macOS, use the shared `observe.mjs` pipe endpoint for signed-in reference work. Use `observe.mjs login`
+  and `login-finish` for explicit manual sign-in. Do not connect automatic tools to an ordinary browser app.
+  Use `pressKey(page, keys)` for system copy/cut/paste. See `tools.md` for the matching windowless runtime.
 - Save screenshots to `research/shots/`, note URL and date, and describe what matters in words.
 
 ## Electron apps

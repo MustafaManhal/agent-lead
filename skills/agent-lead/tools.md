@@ -41,7 +41,26 @@ Write the full path into the project's LEAD.md and briefs (section 4, Commands),
 
 ## Seeing the app and the product being matched
 
-Reference browsers, new tabs, scan recovery and parallel scan windows run in the background. CDP focus emulation keeps keyboard input, clipboard operations, animation and screenshots available without activating the macOS window. Sign-in remains available in the visible browser when the user selects it.
+On macOS, automated browser commands use chrome-headless-shell through a local CDP pipe proxy. They do not
+launch Chrome/Brave application windows, including commands using the legacy `--headed` option. DOM focus,
+real keyboard/pointer input, screenshots, animation, workers, frames, popups and native copy/cut/paste remain
+available. Manual sign-in explicitly opens a visible browser; `observe.mjs login` starts it and `login-finish`
+transfers the session in memory and closes that dedicated browser. Use the same URL/profile/port options for both.
+Never fall back to a browser application or native WebSocket endpoint to recover an automated macOS run.
+
+Keep the browser and driver matched. The verified runtime uses Playwright 1.64.0 with Chromium 156.0.8078.4.
+Install it outside project dependencies:
+
+```sh
+npm install --prefix ~/.config/agent-lead/browser-runtime --save-exact --ignore-scripts playwright@1.64.0
+node ~/.config/agent-lead/browser-runtime/node_modules/playwright/cli.js install chromium --only-shell
+```
+
+`AGENT_LEAD_PLAYWRIGHT_ROOT` selects another matching runtime. The helper also checks the shared runtime and
+then the project. `~/.config/agent-lead/browser.json` may select a stable headless-shell executable. Profiles
+and authentication stay outside Git. Clipboard keys must use `pressKey(page, keys)` from the shared helper;
+this bridges HTML, plain text and PNG between the browser and the macOS pasteboard without activation.
+
 
 | Tool | What it does |
 | --- | --- |

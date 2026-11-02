@@ -25,7 +25,8 @@
 // Safety: steps run only while the tab is still on the reference site (same origin and path prefix). Never type
 // passwords or other credentials: when a sign-in is needed, the user does it in the window. Use a scratch
 // document or test account in the reference product, never the user's real work, unless the user says so.
-import { createBackgroundTarget, keepPageActive, launchBackgroundBrowser } from './browser-background.mjs'
+import { openBrowserLogin, finishBrowserLogin } from './browser-login.mjs'
+import { createBackgroundTarget, keepPageActive, ensurePipeBrowser, automationBrowser, pressKey } from './browser-background.mjs'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { homedir, platform } from 'node:os'
@@ -37,7 +38,7 @@ const o = options(args)
 const ref = config.reference ?? {}
 const URL_ = o.opt('--url') ?? ref.url
 const PROFILE = (o.opt('--profile') ?? ref.profile ?? '~/.config/agent-lead/browser-profile').replace(/^~/, homedir())
-const PORT = Number(o.opt('--port') ?? ref.port ?? 9333)
+const PORT = Number(o.opt('--port') ?? ref.port ?? 9343)
 const MAX = Number(o.opt('--max') ?? 1500)
 const keepGoing = o.flag('--keep-going')
 const file = o.opt('--file')
@@ -46,7 +47,7 @@ if (!URL_) {
   console.error('usage: observe.mjs --url <reference page> step...   (or set "reference.url" in .agent-lead/config.json)')
   process.exit(2)
 }
-const ENDPOINT = `http://127.0.0.1:${PORT}`
+let ENDPOINT = `http://127.0.0.1:${PORT}`
 const scope = (() => {
   const u = new URL(URL_)
   return u.origin + u.pathname.replace(/\/[^/]*$/, '/')
@@ -74,13 +75,15 @@ async function targets() {
 }
 const inScope = (u) => u.startsWith(scope)
 async function ensureBrowser() {
-  if (!(await targets())) {
-    if (!BROWSER) throw new Error('no Chrome, Chromium or Brave found; set "reference.browser" in the config')
-    mkdirSync(PROFILE, { recursive: true })
-    launchBackgroundBrowser(BROWSER, [`--user-data-dir=${PROFILE}`, `--remote-debugging-port=${PORT}`, '--remote-debugging-address=127.0.0.1', '--no-first-run', '--no-startup-window'])
-    for (let i = 0; i < 40 && !(await targets()); i++) await new Promise((r) => setTimeout(r, 500))
-  }
+  if (!BROWSER) throw new Error('no Chrome, Chromium or Brave found; set reference.browser in the config')
+  ENDPOINT = await ensurePipeBrowser({ executable: automationBrowser(BROWSER), profile: PROFILE, port: PORT })
   if (!(await targets())?.some((t) => inScope(t.url))) await createBackgroundTarget(ENDPOINT, URL_)
+}
+
+if (args[0] === 'login') {
+  await openBrowserLogin({ executable: BROWSER, profile: PROFILE, url: URL_, port: PORT + 12 })
+  console.log('Sign in in the visible browser, leave it open, then run observe.mjs with the same options and login-finish.')
+  process.exit(0)
 }
 
 if (args[0] === 'endpoint') {
@@ -90,6 +93,11 @@ if (args[0] === 'endpoint') {
 }
 
 await ensureBrowser()
+if (args[0] === 'login-finish') {
+  await finishBrowserLogin({ endpoint: ENDPOINT, url: URL_, port: PORT + 12 })
+  console.log('Session transferred to the windowless browser; the manual login browser is closed.')
+  process.exit(0)
+}
 const { chromium } = await load('playwright')
 const browser = await chromium.connectOverCDP(ENDPOINT, { timeout: 20000 }).catch((e) => {
   console.log(`✗ cannot attach to the browser on port ${PORT}: ${String(e.message).split('\n')[0]} (quit it and run again)`)
@@ -195,7 +203,7 @@ const steps = {
     await byRole(rest).click({ timeout: 8000 })
     await page.waitForTimeout(400)
     say((await menuItems()).join(' | ') || '(no items)')
-    await page.keyboard.press('Escape')
+    await pressKey(page, 'Escape')
   },
   async pick(rest) {
     await page.locator(MENU).filter({ hasText: rest }).first().click({ timeout: 8000 })
@@ -205,7 +213,7 @@ const steps = {
     const el = byRole(rest.slice(0, eq))
     await el.click({ timeout: 8000 })
     await el.fill(rest.slice(eq + 1))
-    await page.keyboard.press('Enter')
+    await pressKey(page, 'Enter')
   },
   async click(rest) {
     const [x, y] = nums(rest)
@@ -225,7 +233,7 @@ const steps = {
     })
   },
   async key(rest) {
-    await page.keyboard.press(rest)
+    await pressKey(page, rest)
   },
   async type(rest) {
     await page.keyboard.type(rest)
