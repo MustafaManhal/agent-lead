@@ -35,7 +35,8 @@ Files in this skill (read the one you need, when you need it):
 
 ## 1. Start: resume or set up
 
-In Codex, read `workflows/codex.md` first. `$lead` is its command entry point; `$agent` inspects worker status.
+In Codex, read `workflows/codex.md` first. Use `/lead` in the desktop skill menu, or `$lead` in the CLI/IDE.
+The Agent skill (`/agent` in the desktop menu or `$agent`) inspects worker status.
 The adapter supplies the Codex paths, setup and UI equivalents for the shared workflow below.
 
 - **`.agent-lead/LEAD.md` exists** in the project (or in the lead checkout it names): read it fully, then do its
@@ -47,7 +48,8 @@ The adapter supplies the Codex paths, setup and UI equivalents for the shared wo
 - **Every project ends up with the six docs** (PRD, TRD, UI/UX design, app flow, backend schema, implementation plan).
   The implementation plan is the checklist. Do not start feature work on a project without them; for an existing
   project, write them from the code and the user's answers (`foundation.md`), then continue.
-- `/lead` (Claude Code) or `$lead` (Codex) starts the workflow. It always asks the user first which workflow to use this session (Handoff or Pane,
+- `/lead` (Claude Code or the desktop skill menu) or `$lead` (Codex CLI/IDE) starts the workflow.
+  It always asks the user first which workflow to use this session (Handoff or Pane,
   the current one first). A choice that differs from LEAD.md switches the project's workflow; record the change in
   LEAD.md. Any words after `/lead` are the user's goal for this session.
 

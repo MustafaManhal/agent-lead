@@ -13,10 +13,11 @@ Both share the same project files (`.agent-lead/LEAD.md`, `WORKER.md`, `status.m
 
 The same repo is also a Codex plugin (`.codex-plugin/plugin.json`), discoverable through
 `.agents/plugins/marketplace.json`. `skills/lead` adapts the command procedure for `$lead`; `skills/agent`
-provides `$agent` status. Read `skills/agent-lead/workflows/codex.md` for paths and host differences.
+provides `$agent` status. In the desktop app, enabled short skill aliases also appear as `/lead` and `/agent`
+in the slash menu. Read `skills/agent-lead/workflows/codex.md` for paths and host differences.
 `hooks/codex.json` explicitly selects the Codex SessionStart hook so it never loads Claude's module hooks.
 That hook runs `install-codex.mjs`, which copies worker tools without modifying approval rules or other CLIs'
-settings. Standalone installs add `--skills`. `agent-view.mjs` uses `hooks/parse.ts` (copied as `parse.ts` beside
+settings. The hook passes `--skills` to install the short aliases too. `agent-view.mjs` uses `hooks/parse.ts` (copied as `parse.ts` beside
 the installed viewer); Node.js 22.18+ can execute its erasable TypeScript. The Claude parser and UI stay shared.
 Codex uses a terminal viewer in place of a custom side pane and a separate log under its runtime directory.
 

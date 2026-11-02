@@ -83,7 +83,7 @@ exec bash "$here/${target}" "$@"
   }
   await put(join(dest, 'installed-version'), Buffer.from(manifest.version + '\n'))
   console.log(`Agent Lead ${manifest.version}: worker tools ready in ${dest}`)
-  if (installSkills) console.log(`Skills ready in ${skillsDir}: $lead, $agent, $agent-lead. Start a new session if needed.`)
+  if (installSkills) console.log(`Skills ready in ${skillsDir}. Desktop app: type /lead and select Lead; CLI/IDE: $lead. Start a new session if needed.`)
 } catch (error) {
   console.error(`agent-lead setup: ${error.message}`)
   process.exitCode = 1

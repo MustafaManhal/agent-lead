@@ -1,22 +1,24 @@
 # Codex adapter
 
 Codex uses the same briefs, reports, review loop, six docs, checklist and project playbook as Claude Code.
-Use `$lead` (or select Lead from the skills picker) for the command procedure. `$agent-lead` still loads the
-full procedure. Codex's entry points are skills, not Claude's `/lead`, `/agent` or `/agy` command registrations.
-These short names refer to standalone skills. The plugin qualifies them as `$agent-lead:lead`,
-`$agent-lead:agent` and `$agent-lead:agent-lead`; select the matching skill from the host's picker.
+In the desktop app, type `/lead` and select Lead from the slash menu. Enabled skills appear in that menu;
+the installed short `lead` alias supplies the bare name. `/agent` selects the worker-status skill in the same
+way. CLI/IDE users can invoke `$lead`, `$agent`, or `$agent-lead` for the full procedure.
+The plugin also exposes qualified skills (`agent-lead:lead`, `agent-lead:agent`, `agent-lead:agent-lead`).
+These are skill entries in the host's menu, rather than Claude's command-registration API.
 
 ## Setup
 
-The Codex plugin bundles `lead`, `agent`, and `agent-lead`. Its trusted SessionStart hook installs the worker
-tools under `~/.codex/agent-runs/` (or `$CODEX_HOME/agent-runs/`). If hooks are unavailable or untrusted, run:
+The Codex plugin bundles `lead`, `agent`, and `agent-lead`. Its trusted SessionStart hook installs the short
+skill aliases under `~/.agents/skills/` and worker tools under `~/.codex/agent-runs/` (or `$CODEX_HOME/agent-runs/`).
+If hooks are unavailable or untrusted, run:
 
 ```bash
-node <agent-lead skill>/install-codex.mjs
+node <agent-lead skill>/install-codex.mjs --skills
 ```
 
-For a standalone installation from a repo clone, add `--skills` to install all three skills in
-`~/.agents/skills/`. Existing changed files get a `.bak-agent-lead` backup. Setup is safe to repeat after an
+The same command works for a standalone installation from a repo clone. Existing changed files get a
+`.bak-agent-lead` backup. Setup is safe to repeat after an
 update. It never changes Codex approval policy, Claude settings, or other worker CLIs' allow lists.
 
 Node.js 22.18 or newer is required for the status viewer, which shares Claude's TypeScript event parser.
@@ -25,7 +27,7 @@ normal permission flow; do not run Claude's `setup.sh` from Codex.
 
 ## Choose the workflow
 
-Ask on every `$lead` invocation, putting the project's current mode first:
+Ask on every `/lead` or `$lead` invocation, putting the project's current mode first:
 
 - **Handoff**: the user launches the worker and pastes the brief prompt.
 - **Launched worker (Pane in the shared playbook)**: Codex runs `agent-run`; the user watches a terminal viewer.

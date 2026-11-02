@@ -131,22 +131,25 @@ codex plugin marketplace add MustafaManhal/agent-lead
 codex plugin add agent-lead@agent-lead
 ```
 
-Start a new session, choose **Lead** (`agent-lead:lead`) in the skills picker, and add your goal.
+In the desktop app, start a new chat, type `/lead`, select **Lead** in the slash menu, and add your goal.
+Enabled skills appear in the app's slash menu. The setup below installs a short `lead` alias so you can use
+the bare name. Type `/agent` to select the worker-status skill the same way.
+
+In CLI/IDE sessions, use `$lead` or the skills picker.
 The plugin's qualified skill names are `$agent-lead:lead`, `$agent-lead:agent` (worker status), and
 `$agent-lead:agent-lead` (the full workflow). Standalone aliases below use `$lead`, `$agent`, and `$agent-lead`.
-These are Codex skill entry points; they do not
-register bare `/lead` or `/agent` slash commands, which belong to Claude Code.
 
 The repo includes `.codex-plugin/plugin.json` and `.agents/plugins/marketplace.json`; the latter also works as
 a local repo marketplace. To test a clone, use `codex plugin marketplace add /absolute/path/to/agent-lead`, then
 the same `plugin add` command. Plugin support and installation UI vary by Codex surface.
 
-The trusted SessionStart hook installs worker tools into `~/.codex/agent-runs/` (or `$CODEX_HOME/agent-runs/`).
+The trusted SessionStart hook installs the short aliases in `~/.agents/skills/` and worker tools into
+`~/.codex/agent-runs/` (or `$CODEX_HOME/agent-runs/`).
 Hooks require the user's normal trust review and may not run on every surface. The bundled skills work without
 the hook; install the runtime manually when needed:
 
 ```bash
-node /absolute/path/to/agent-lead/skills/agent-lead/install-codex.mjs
+node /absolute/path/to/agent-lead/skills/agent-lead/install-codex.mjs --skills
 ```
 
 Setup copies the launcher, wrapper, worker rules, status viewer and the same event parser used by Claude's pane.
@@ -171,7 +174,8 @@ is its live view. The six docs, checklist page, project files, tools and review/
 
 For the supported Codex packaging, skill invocation and hook trust rules, see
 [OpenAI's plugin documentation](https://developers.openai.com/plugins/build/plugins) and
-[skills documentation](https://learn.chatgpt.com/docs/build-skills).
+[skills documentation](https://learn.chatgpt.com/docs/build-skills). The
+[desktop slash-command reference](https://learn.chatgpt.com/docs/reference/slash-commands) documents skills in the slash menu.
 
 ### Codex, Gemini CLI, OpenCode, Cursor and other agents
 
@@ -196,7 +200,7 @@ Update later with `git -C ~/.agent-lead pull`. Then restart the agent and start 
 
 | Agent | Where it finds the skill | Start the lead |
 | --- | --- | --- |
-| Codex (CLI, IDE extension) | Plugin above, or standalone `~/.agents/skills/` | Select **Lead** from the plugin; standalone: `$lead`, `$agent`, `$agent-lead` |
+| Codex / desktop app | Plugin above, or standalone `~/.agents/skills/` | Desktop: type `/lead` and select Lead; CLI/IDE: `$lead` |
 | Gemini CLI | `~/.agents/skills/` or `~/.gemini/skills/`; `.agents/skills/` or `.gemini/skills/` in the repo | Ask "use the agent-lead skill and lead this project"; `/skills list` shows it, `/skills reload` picks up a new folder |
 | OpenCode | `~/.agents/skills/`, `~/.config/opencode/skills/` or `~/.claude/skills/`; the same under `.agents/`, `.opencode/` or `.claude/` in the repo | Ask "use the agent-lead skill and lead this project" |
 | Cursor | `~/.agents/skills/` or `~/.cursor/skills/`; `.agents/skills/` or `.cursor/skills/` in the repo | `/agent-lead` in Agent chat |
@@ -206,7 +210,7 @@ To share the skill with a team through the repo instead, copy (or add as a git s
 `skills/agent-lead` into the project's `.agents/skills/agent-lead`.
 
 What changes when the lead is not Claude Code:
-- Use the host's skill invocation, as above. Codex has the `$lead` and `$agent` entry points.
+- Use the host's skill invocation: `/lead` and `/agent` in the desktop app's skill menu, or `$lead` and `$agent` in the CLI/IDE.
 - Codex has a terminal viewer for launched workers. Other hosts can use Handoff or start a worker from their shell.
 - The checklist page is kept as a local file, `.agent-lead/checklist.html` (publishing it as a private link uses
   Claude's Artifact tool). Open it in a browser.
