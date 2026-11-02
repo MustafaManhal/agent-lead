@@ -41,6 +41,8 @@ Write the full path into the project's LEAD.md and briefs (section 4, Commands),
 
 ## Seeing the app and the product being matched
 
+Reference browsers, new tabs, scan recovery and parallel scan windows run in the background. CDP focus emulation keeps keyboard input, clipboard operations, animation and screenshots available without activating the macOS window. Sign-in remains available in the visible browser when the user selects it.
+
 | Tool | What it does |
 | --- | --- |
 | `play.mjs [--url u] [--ready js] step…` | Drives the running app with real pointer and keyboard input through Playwright: `js:`, `click:`, `drag:`, `move:`, `key:`, `type:`, `tap:role:name`, `text:`, `ui`, `wait:`, `shot:`. Fresh browser each run; prints page errors. |
@@ -51,7 +53,7 @@ Write the full path into the project's LEAD.md and briefs (section 4, Commands),
 | `macos/windows.swift "<app>"` | An app's windows (pid, id, title, frame) as JSON lines. |
 | `macos/input.swift --pid <pid> click\|drag\|key …` | Real input for native and Electron apps; refuses unless that app is frontmost. |
 | `macos/clip.swift set\|get\|types` | The clipboard as HTML or text, to check copy and paste between your app and another. |
-| `macos/ax-tree.swift <pid> [max]` | Reads a macOS app's accessibility tree, window by window plus the menu bar, as JSON lines (role, name, value, enabled, frame). Brings the app forward first (macOS lists only the current Space's windows). Requires Accessibility permission for the app running the command. Used by `scan.mjs --native`. |
+| `macos/ax-tree.swift <pid> [max]` | Reads a macOS app's accessibility tree, window by window plus the menu bar, as JSON lines (role, name, value, enabled, frame). Reads in the background; `--foreground` explicitly switches to another Space when that is needed. Requires Accessibility permission for the app running the command. Used by `scan.mjs --native`. |
 | `macos/ax-enable.swift <pid>` | Turns on an Electron app's accessibility tree so tools can read and press its controls. |
 
 ## Research and shared resources

@@ -1,6 +1,6 @@
 {
   "name": "agent-lead",
-  "version": "0.11.1",
+  "version": "0.11.2",
   "description": "Lead a project with a worker agent: start with the Lead skill, review reports, and inspect runs with Agent.",
   "author": { "name": "Mustafa Manhal" },
   "license": "MIT",

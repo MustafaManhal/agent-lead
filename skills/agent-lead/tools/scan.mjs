@@ -64,6 +64,7 @@
 // Safety: it never types, never clicks names matching the destructive list (delete, share, publish, pay, sign
 // out, …), closes any tab the app opens, dismisses browser dialogs and stays on the app's origin. Use a scratch
 // document or test account. The user signs in by hand in the observe browser (`observe.mjs start`).
+import { keepPageActive, newBackgroundPage } from './browser-background.mjs'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -326,14 +327,14 @@ async function crawl(run) {
   const startPath = new URL(START).pathname
   let page = null
   if (run.ownWindow) {
-    // Parallel runs: a window of its own (a background tab is throttled), registered so no other run closes it.
+    // Parallel runs keep their own background window, registered so no other run closes it.
     // Find the page by the id Chrome gives the new window: no guessing between runs opening windows at once.
     pendingWindows++
     let targetId
     try {
       windowSession ??= browser.newBrowserCDPSession()
       const bs = await windowSession
-      ;({ targetId } = await bs.send('Target.createTarget', { url: START, newWindow: true }))
+      ;({ targetId } = await bs.send('Target.createTarget', { url: START, newWindow: true, background: true, focus: false }))
       run.targetId = targetId
       for (let i = 0; i < 100 && !page; i++) {
         for (const p of browser.contexts().flatMap((c) => c.pages())) {
@@ -359,7 +360,7 @@ async function crawl(run) {
     page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(origin) && new URL(p.url()).pathname === startPath && !scanPages.has(p)) ?? null
     page ??= browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(origin) && !scanPages.has(p)) ?? null
     if (!page) {
-      page = await browser.contexts()[0].newPage()
+      page = await newBackgroundPage(browser.contexts()[0])
       await page.goto(START)
     }
   }
@@ -382,11 +383,8 @@ async function crawl(run) {
   try {
   // Leave-page prompts are accepted (a reload is how the scan goes back); every other dialog is dismissed.
   page.on('dialog', (d) => (d.type() === 'beforeunload' ? d.accept() : d.dismiss()).catch(() => {}))
-  await page.bringToFront().catch(() => {})
-  // A window behind others stops painting and animation frames; keep the tab active and focused for the scan.
-  const cdp = await context.newCDPSession(page).catch(() => null)
-  await cdp?.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {})
-  await cdp?.send('Page.setWebLifecycleState', { state: 'active' }).catch(() => {})
+  await keepPageActive(page)
+  // Emulate focus for painting and input without activating the desktop window.
   const vp = run.viewport ?? VIEWPORT
   if (vp) { const [w, h] = vp.split('x').map(Number); await page.setViewportSize({ width: w, height: h }) }
   await page.emulateMedia({ colorScheme: run.colorScheme ?? SCHEME ?? null }).catch(() => {})
@@ -556,7 +554,7 @@ async function crawl(run) {
     let targetId
     let next = null
     try {
-      ;({ targetId } = await bs.send('Target.createTarget', { url: START, newWindow: false }))
+      ;({ targetId } = await bs.send('Target.createTarget', { url: START, newWindow: false, background: true, focus: false }))
       for (let i = 0; i < 100 && !next; i++) {
         for (const p of context.pages()) {
           if (scanPages.has(p)) continue
@@ -581,12 +579,9 @@ async function crawl(run) {
     next.on('dialog', (d) => (d.type() === 'beforeunload' ? d.accept() : d.dismiss()).catch(() => {}))
     page = next
     tabSince = Date.now()
-    // In front at once: heavy apps load slowly, or never, in a tab that is not shown.
-    await page.bringToFront().catch(() => {})
+    // Keep heavy apps rendering without bringing the browser to the foreground.
+    await keepPageActive(page)
     if (run.ownWindow) run.targetId = targetId
-    const c2 = await context.newCDPSession(page).catch(() => null)
-    await c2?.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {})
-    await c2?.send('Page.setWebLifecycleState', { state: 'active' }).catch(() => {})
     await page.waitForLoadState('domcontentloaded', { timeout: 90000 }).catch(() => {})
     scanPages.delete(old)
     if (oldId) await bs.send('Target.closeTarget', { targetId: oldId }).catch(() => old.close().catch(() => {}))
@@ -608,7 +603,7 @@ async function crawl(run) {
     }
     if (await softRestore(path)) return
     // A reload of the same page is safer than navigating to it again (heavy apps such as Figma can stall on a goto).
-    if (page.isClosed()) { scanPages.delete(page); page = await context.newPage(); scanPages.add(page); page.on('dialog', (d) => (d.type() === 'beforeunload' ? d.accept() : d.dismiss()).catch(() => {})); console.log('  the scan tab was closed; continuing in a new tab') }
+    if (page.isClosed()) { scanPages.delete(page); page = await newBackgroundPage(context); scanPages.add(page); page.on('dialog', (d) => (d.type() === 'beforeunload' ? d.accept() : d.dismiss()).catch(() => {})); console.log('  the scan tab was closed; continuing in a new tab') }
     // Reloading always reuses the tab's process, and a heavy app's memory grows with each reload until it hangs
     // (Figma: 2.4 GB at 100% CPU, stuck on its loading bar). Every RECYCLE reloads, and whenever a load does not
     // become ready, the scan moves to a fresh tab (a new process) and closes the old one.
@@ -619,7 +614,7 @@ async function crawl(run) {
       const samePage = (() => { try { return new URL(page.url()).pathname === new URL(START).pathname } catch { return false } })()
       await (samePage ? page.reload({ timeout: 90000, waitUntil: 'domcontentloaded' }) : page.goto(START, { timeout: 90000, waitUntil: 'domcontentloaded' })).catch((e) => console.log(`  reload: ${String(e.message).split('\n')[0]}`))
     }
-    await page.bringToFront().catch(() => {})
+    await keepPageActive(page)
     for (let tries = 0; RDY && tries < 3; tries++) {
       if (await page.waitForFunction(RDY, null, { timeout: 60000, polling: 500 }).then(() => true, () => false)) break
       await freshTab('not ready after loading')

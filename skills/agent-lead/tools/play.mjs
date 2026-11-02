@@ -13,6 +13,7 @@
 //   ui[:text]              named controls as text (cheaper than a screenshot), optionally filtered
 //   shot:<file.png>[,x,y,w,h]
 // Page errors are printed at the end. Playwright must be installed in the project (npm i -D playwright).
+import { backgroundArgs, keepPageActive, launchBackgroundSession } from './browser-background.mjs'
 import { readFileSync } from 'node:fs'
 import { config, load, options } from './lib.mjs'
 
@@ -31,8 +32,11 @@ if (!url) {
 }
 
 const { chromium } = await load('playwright')
-const browser = await chromium.launch({ headless: !headed })
-const page = await browser.newPage({ viewport: { width: w, height: h }, colorScheme: dark ? 'dark' : 'light' })
+const contextOptions = { viewport: { width: w, height: h }, colorScheme: dark ? 'dark' : 'light' }
+const background = headed ? await launchBackgroundSession(chromium, { contextOptions }) : null
+const browser = background?.browser ?? await chromium.launch({ headless: true, args: backgroundArgs })
+const page = background?.page ?? await browser.newPage(contextOptions)
+await keepPageActive(page)
 const errors = []
 page.on('pageerror', (e) => errors.push(e.message.slice(0, 200)))
 try {
@@ -100,4 +104,4 @@ for (const step of steps) {
   }
 }
 if (errors.length) console.log(`page errors: ${errors.slice(0, 3).join(' | ')}`)
-await browser.close()
+await (background ? background.close() : browser.close())

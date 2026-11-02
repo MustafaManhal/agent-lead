@@ -25,7 +25,7 @@
 // Safety: steps run only while the tab is still on the reference site (same origin and path prefix). Never type
 // passwords or other credentials: when a sign-in is needed, the user does it in the window. Use a scratch
 // document or test account in the reference product, never the user's real work, unless the user says so.
-import { spawn } from 'node:child_process'
+import { createBackgroundTarget, keepPageActive, launchBackgroundBrowser } from './browser-background.mjs'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { homedir, platform } from 'node:os'
@@ -77,13 +77,10 @@ async function ensureBrowser() {
   if (!(await targets())) {
     if (!BROWSER) throw new Error('no Chrome, Chromium or Brave found; set "reference.browser" in the config')
     mkdirSync(PROFILE, { recursive: true })
-    spawn(BROWSER, [`--user-data-dir=${PROFILE}`, `--remote-debugging-port=${PORT}`, '--remote-debugging-address=127.0.0.1', '--no-first-run', URL_], {
-      detached: true,
-      stdio: 'ignore',
-    }).unref()
+    launchBackgroundBrowser(BROWSER, [`--user-data-dir=${PROFILE}`, `--remote-debugging-port=${PORT}`, '--remote-debugging-address=127.0.0.1', '--no-first-run', '--no-startup-window'])
     for (let i = 0; i < 40 && !(await targets()); i++) await new Promise((r) => setTimeout(r, 500))
   }
-  if (!(await targets())?.some((t) => inScope(t.url))) await fetch(`${ENDPOINT}/json/new?${encodeURIComponent(URL_)}`, { method: 'PUT' }).catch(() => {})
+  if (!(await targets())?.some((t) => inScope(t.url))) await createBackgroundTarget(ENDPOINT, URL_)
 }
 
 if (args[0] === 'endpoint') {
@@ -108,6 +105,7 @@ if (!page) {
   console.log(`✗ no tab on ${scope} (open ${URL_} in the observer window)`)
   process.exit(1)
 }
+await keepPageActive(page)
 if (args[0] === 'start') {
   await page.waitForLoadState('domcontentloaded').catch(() => {})
   console.log(`ready: ${await page.title()}  ·  ${ENDPOINT}  ·  profile ${PROFILE}`)
