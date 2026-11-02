@@ -1,5 +1,8 @@
 # Pane workflow: you launch the worker, the user watches /agent
 
+**Codex lead:** read `codex.md` first. Use its setup, launcher/log paths and `$agent`/terminal viewer in place of
+the Claude-specific setup and pane below. The item and review loop is shared.
+
 You start the worker CLI headless with `agent-run`. Every step it takes (files read and written, commands and exit
 codes, refused commands in red, its reply, time and tokens) shows live in the `/agent` pane beside the chat.
 

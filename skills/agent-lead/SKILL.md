@@ -24,6 +24,7 @@ Files in this skill (read the one you need, when you need it):
 | `playwright.md` | Checking UI with real input, screenshots, reading other products' screens, Electron apps. |
 | `workflows/handoff.md` | Handoff mode: the prompts the user pastes, "report ready", quota stops, the worker's checkout. |
 | `workflows/pane.md` | Pane mode: launching a worker CLI with `agent-run`, follow-ups, the live pane. |
+| `workflows/codex.md` | Codex lead: `$lead` and `$agent`, plugin/standalone setup, launched workers and the terminal status viewer. Read this adapter before the shared procedures in Codex. |
 | `review.md` | Every time a worker reports: the review checklist and how to write a review round. |
 | `clis.md` | Flags, resume options and rules files of each worker CLI. |
 | `templates/` | `docs/01-PRD.md` … `docs/06-implementation-plan.md`, `LEAD.md`, `WORKER.md`, `brief.md`, `review-round.md`, `status.md`, `decisions.md`, `AGENTS.md` (pointer section), `allow-lists.md`. |
@@ -34,6 +35,9 @@ Files in this skill (read the one you need, when you need it):
 
 ## 1. Start: resume or set up
 
+In Codex, read `workflows/codex.md` first. `$lead` is its command entry point; `$agent` inspects worker status.
+The adapter supplies the Codex paths, setup and UI equivalents for the shared workflow below.
+
 - **`.agent-lead/LEAD.md` exists** in the project (or in the lead checkout it names): read it fully, then do its
   "Start of every session" steps. It holds the workflow, the worker, every path, the commands, the conventions and
   the current state. Tell the user in two or three lines where things stand and what comes next, with the checklist
@@ -43,7 +47,7 @@ Files in this skill (read the one you need, when you need it):
 - **Every project ends up with the six docs** (PRD, TRD, UI/UX design, app flow, backend schema, implementation plan).
   The implementation plan is the checklist. Do not start feature work on a project without them; for an existing
   project, write them from the code and the user's answers (`foundation.md`), then continue.
-- `/lead` is the only command. It always asks the user first which workflow to use this session (Handoff or Pane,
+- `/lead` (Claude Code) or `$lead` (Codex) starts the workflow. It always asks the user first which workflow to use this session (Handoff or Pane,
   the current one first). A choice that differs from LEAD.md switches the project's workflow; record the change in
   LEAD.md. Any words after `/lead` are the user's goal for this session.
 

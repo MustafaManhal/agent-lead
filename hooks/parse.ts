@@ -402,6 +402,7 @@ export function parseRun(text: string, mtimeMs: number, now: number): AgentView 
   run.view.steps = run.order.map(key => run.steps.get(key)!).filter(Boolean)
   const lastReply = [...run.replyOrder].reverse().map(key => run.replies.get(key) ?? '').find(text => text.trim() !== '')
   run.view.reply = lastReply ?? ''
+  if (run.view.status === 'running' && run.startedAt) run.view.seconds = Math.max(0, Math.round((now - run.startedAt) / 1000))
   if (run.view.status === 'running' && now - mtimeMs > STALE_MS) run.view.status = 'done'
 
   return run.view

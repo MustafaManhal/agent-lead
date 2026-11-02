@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lead"
+  short_description: "Start or resume a project with a worker agent"
+  default_prompt: "Use $lead to lead this project with a worker agent."

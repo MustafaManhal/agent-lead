@@ -9,6 +9,21 @@ You are probably the lead agent: the coding agent in the user's main session. Th
 
 Both share the same project files (`.agent-lead/LEAD.md`, `WORKER.md`, `status.md`, `briefs/`), the six product docs (PRD, TRD, UI/UX design, app flow, backend schema, implementation plan; the last is the checklist), the review checklist (`review.md`) and the ship steps (SKILL.md section 3).
 
+## Codex host
+
+The same repo is also a Codex plugin (`.codex-plugin/plugin.json`), discoverable through
+`.agents/plugins/marketplace.json`. `skills/lead` adapts the command procedure for `$lead`; `skills/agent`
+provides `$agent` status. Read `skills/agent-lead/workflows/codex.md` for paths and host differences.
+`hooks/codex.json` explicitly selects the Codex SessionStart hook so it never loads Claude's module hooks.
+That hook runs `install-codex.mjs`, which copies worker tools without modifying approval rules or other CLIs'
+settings. Standalone installs add `--skills`. `agent-view.mjs` uses `hooks/parse.ts` (copied as `parse.ts` beside
+the installed viewer); Node.js 22.18+ can execute its erasable TypeScript. The Claude parser and UI stay shared.
+Codex uses a terminal viewer in place of a custom side pane and a separate log under its runtime directory.
+
+Validate changes with `node --test tests/codex.test.mjs tests/scan/core.test.mjs tests/scan/mcp-client.test.mjs`
+and `claude plugin validate .`. `tests/codex.test.mjs` uses temporary runtime/skill directories and fake workers;
+it never starts a paid agent or changes the user's config. Test plugin discovery with `codex plugin list --available --json`.
+
 ## The parts
 
 | Part | Where | Job |

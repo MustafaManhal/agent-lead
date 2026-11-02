@@ -5,6 +5,7 @@ continue without the earlier conversations. The method is the agent-lead skill; 
 facts. Keep section 8 current.
 
 ## 1. Workflow
+- Lead host: <Claude Code | Codex | other>. Entry point: </lead | $lead | skill name>.
 - Mode: <Handoff | Pane>. Worker: <agent and model>. Changed on <date> because <reason>.
 - The worker does about 95% of each item (build, tests, in-app check, research, report). The lead plans, writes
   briefs, reviews, commits, keeps the checklist and reports to the user.
@@ -43,6 +44,8 @@ facts. Keep section 8 current.
 | The reference product (if any) | `node <skill>/tools/observe.mjs <steps>` |
 | Layout, tap-target and contrast audit | `node <skill>/tools/audit-ui.mjs --routes "/,…"` |
 | Shared resource lock (parallel workers) | `node <skill>/tools/lock.mjs take\|release <name> <holder>` |
+| Worker launcher (Pane/launched mode) | <absolute runtime path>/agent-run <cli> <brief> --cd <worker checkout> |
+| Worker status (Codex) | `node <runtime>/agent-view.mjs --json` (log: <absolute path>/live.log) |
 | Checklist page (rebuild, then republish to the URL above) | `node <skill>/plan-page.mjs <plan.md> .agent-lead/checklist.html --title "<Project> plan"` |
 
 ## 5. Conventions

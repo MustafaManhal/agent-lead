@@ -22,9 +22,9 @@ resume=""
 model=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --cd) dir="$2"; shift 2 ;;
-    --resume) resume="$2"; shift 2 ;;
-    --model) model="$2"; shift 2 ;;
+    --cd) [ "$#" -ge 2 ] || usage; dir="$2"; shift 2 ;;
+    --resume) [ "$#" -ge 2 ] || usage; resume="$2"; shift 2 ;;
+    --model) [ "$#" -ge 2 ] || usage; model="$2"; shift 2 ;;
     *) usage ;;
   esac
 done

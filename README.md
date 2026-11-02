@@ -1,7 +1,8 @@
 # agent-lead
 
-Make Claude Code the **lead** of your project and another coding agent the **worker**. Works in any project. Codex,
-Gemini CLI, OpenCode and Cursor can be the lead too ([install for other agents](#codex-gemini-cli-opencode-cursor-and-other-agents)).
+Make Claude Code or Codex the **lead** of your project and another coding agent the **worker**. Works in any
+project. Both have plugin packages; Gemini CLI, OpenCode and Cursor can use the shared skill too
+([install for other agents](#codex-gemini-cli-opencode-cursor-and-other-agents)).
 
 - **The lead (Claude Code)** asks the right questions, does the research, writes the six product docs (PRD, TRD,
   UI/UX design, app flow, backend schema, implementation plan), keeps the checklist, writes a brief per item,
@@ -121,10 +122,69 @@ to the prompt box, Plugins, Add marketplace `MustafaManhal/agent-lead`, then Add
 Already installed? Update it (`/plugin marketplace update agent-lead`) and restart Claude Code; the setup runs again
 for the new version.
 
+### Codex plugin
+
+With Codex CLI's plugin commands:
+
+```bash
+codex plugin marketplace add MustafaManhal/agent-lead
+codex plugin add agent-lead@agent-lead
+```
+
+Start a new session, choose **Lead** (`agent-lead:lead`) in the skills picker, and add your goal.
+The plugin's qualified skill names are `$agent-lead:lead`, `$agent-lead:agent` (worker status), and
+`$agent-lead:agent-lead` (the full workflow). Standalone aliases below use `$lead`, `$agent`, and `$agent-lead`.
+These are Codex skill entry points; they do not
+register bare `/lead` or `/agent` slash commands, which belong to Claude Code.
+
+The repo includes `.codex-plugin/plugin.json` and `.agents/plugins/marketplace.json`; the latter also works as
+a local repo marketplace. To test a clone, use `codex plugin marketplace add /absolute/path/to/agent-lead`, then
+the same `plugin add` command. Plugin support and installation UI vary by Codex surface.
+
+The trusted SessionStart hook installs worker tools into `~/.codex/agent-runs/` (or `$CODEX_HOME/agent-runs/`).
+Hooks require the user's normal trust review and may not run on every surface. The bundled skills work without
+the hook; install the runtime manually when needed:
+
+```bash
+node /absolute/path/to/agent-lead/skills/agent-lead/install-codex.mjs
+```
+
+Setup copies the launcher, wrapper, worker rules, status viewer and the same event parser used by Claude's pane.
+It preserves the first changed copy as `.bak-agent-lead`, is safe to repeat, and does not modify Codex approval
+policy, Claude settings, or worker allow lists. Use the worker CLI's normal permission setup for agy or Cursor.
+The viewer requires Node.js 22.18 or newer; worker CLIs must already be installed and signed in.
+
+The workflow includes both Handoff and launched workers (recorded as Pane in the shared playbook). A launched
+worker keeps the same sandbox/allow-list limits, brief/report contract and `--resume` review rounds:
+
+```bash
+~/.codex/agent-runs/agent-run codex /absolute/brief.md --cd /absolute/worker-checkout
+node ~/.codex/agent-runs/agent-view.mjs --json
+node ~/.codex/agent-runs/agent-view.mjs --watch
+```
+
+The terminal viewer shows tool steps, failures, denied calls, session ID, final reply, elapsed time, tokens and
+exit code. Ctrl-C closes the viewer without stopping the worker. `$agent` gives a snapshot in the conversation.
+`AGENT_LEAD_LOG` (or the viewer's `--log`) chooses a different log. Codex runs use their own log by default so
+they do not overwrite Claude's pane. Codex does not provide Claude's custom side-pane UI; the terminal viewer
+is its live view. The six docs, checklist page, project files, tools and review/ship procedure are shared.
+
+For the supported Codex packaging, skill invocation and hook trust rules, see
+[OpenAI's plugin documentation](https://developers.openai.com/plugins/build/plugins) and
+[skills documentation](https://learn.chatgpt.com/docs/build-skills).
+
 ### Codex, Gemini CLI, OpenCode, Cursor and other agents
 
-The skill is a standard `SKILL.md` folder (the open Agent Skills format), so other agents can be the lead too.
-Codex, Gemini CLI, OpenCode and Cursor all read skills from `~/.agents/skills/`. Install it once there:
+The shared skill uses the open Agent Skills format. For a standalone Codex installation without a plugin
+marketplace, clone the repo and install the runtime and all three skills:
+
+```bash
+git clone https://github.com/MustafaManhal/agent-lead.git ~/.agent-lead
+node ~/.agent-lead/skills/agent-lead/install-codex.mjs --skills
+```
+
+Update with `git -C ~/.agent-lead pull`, rerun the installer, and start a new session. For the other agents,
+install just the shared skill in `~/.agents/skills/`:
 
 ```bash
 git clone https://github.com/MustafaManhal/agent-lead.git ~/.agent-lead
@@ -136,7 +196,7 @@ Update later with `git -C ~/.agent-lead pull`. Then restart the agent and start 
 
 | Agent | Where it finds the skill | Start the lead |
 | --- | --- | --- |
-| Codex (CLI, IDE extension) | `~/.agents/skills/` (all projects) or `.agents/skills/` in the repo | `$agent-lead`, or pick it from `/skills` |
+| Codex (CLI, IDE extension) | Plugin above, or standalone `~/.agents/skills/` | Select **Lead** from the plugin; standalone: `$lead`, `$agent`, `$agent-lead` |
 | Gemini CLI | `~/.agents/skills/` or `~/.gemini/skills/`; `.agents/skills/` or `.gemini/skills/` in the repo | Ask "use the agent-lead skill and lead this project"; `/skills list` shows it, `/skills reload` picks up a new folder |
 | OpenCode | `~/.agents/skills/`, `~/.config/opencode/skills/` or `~/.claude/skills/`; the same under `.agents/`, `.opencode/` or `.claude/` in the repo | Ask "use the agent-lead skill and lead this project" |
 | Cursor | `~/.agents/skills/` or `~/.cursor/skills/`; `.agents/skills/` or `.cursor/skills/` in the repo | `/agent-lead` in Agent chat |
@@ -146,12 +206,11 @@ To share the skill with a team through the repo instead, copy (or add as a git s
 `skills/agent-lead` into the project's `.agents/skills/agent-lead`.
 
 What changes when the lead is not Claude Code:
-- No `/lead` command: ask for the skill by name, as above.
-- No `/agent` pane, so use the Handoff workflow (you paste each brief into the worker), or let the lead start
-  the worker CLI from its own shell.
+- Use the host's skill invocation, as above. Codex has the `$lead` and `$agent` entry points.
+- Codex has a terminal viewer for launched workers. Other hosts can use Handoff or start a worker from their shell.
 - The checklist page is kept as a local file, `.agent-lead/checklist.html` (publishing it as a private link uses
   Claude's Artifact tool). Open it in a browser.
-- Questions come as plain chat messages instead of option pickers.
+- Use the host's question tool when available, otherwise plain chat.
 - The tools work the same: `node ~/.agents/skills/agent-lead/tools/check.mjs` and the rest (`tools.md`).
 
 Workers need nothing installed: any coding agent CLI can be the worker in either workflow.

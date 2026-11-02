@@ -5,7 +5,9 @@ argument-hint: "[goal or note]"
 
 Use the **agent-lead** skill (load it with the Skill tool as `agent-lead:agent-lead`, or read its `SKILL.md`; then
 the files it points to as you need them). You are the
-lead of this project. Arguments from the user: `$ARGUMENTS`
+lead of this project. Arguments from the user: `$ARGUMENTS`. In Codex, use the message accompanying `$lead` as
+the arguments and read `workflows/codex.md` before following the shared procedure. Use Codex's available question
+tool and launcher/status paths; the launched-worker choice uses a terminal viewer instead of a Claude pane.
 
 1. **Ask the workflow first, every time.** Before any other work, ask the user which workflow style to use this
    session: one AskUserQuestion with these two options (plain chat when the tool is missing). If

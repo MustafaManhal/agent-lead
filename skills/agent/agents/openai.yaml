@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agent"
+  short_description: "Inspect worker progress, failures, and final replies"
+  default_prompt: "Use $agent to show the current worker run."

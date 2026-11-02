@@ -4,6 +4,9 @@ Goal: in one short exchange, know the project, agree the workflow with the user,
 exist (their last one, the implementation plan, is the checklist), and leave a `.agent-lead/LEAD.md` that lets any
 later session continue without this conversation.
 
+In Codex, apply `workflows/codex.md`: `$lead` starts the workflow and the launched-worker option uses a terminal
+viewer. Adapt the labels and setup below to the available tools; record the lead host and runtime paths in LEAD.md.
+
 ## 1. Discover (read only, quick)
 
 Run these yourself; do not ask the user what you can find out.
