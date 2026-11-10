@@ -16,7 +16,7 @@ It never copies other people's code, images, icons or text into the product.
 
 ## Matching an existing app
 
-Capture the reference once before writing docs or briefs (`observe.mjs`, or the separate app-scan tool for a full
+Capture the reference once before writing docs or briefs (`observe.mjs`, or the separate scan-tool tool for a full
 crawl) and save it under `research/`; briefs cite those files instead of asking the worker to look again.
 
 ## Rules
