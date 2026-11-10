@@ -9,8 +9,8 @@
 // "[x] a. …" markers inside an item are its parts. "## …" headings are milestones (only those that hold items, or
 // those matching --sections); "### …" headings, or a short plain line right before items, group items inside one.
 // Prints a JSON summary: { out, sections, done, partial, todo, percent, next }.
-import { readFileSync, statSync, writeFileSync } from 'node:fs'
-import { basename } from 'node:path'
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { basename, dirname } from 'node:path'
 
 const args = process.argv.slice(2)
 const flag = (name) => {
@@ -376,6 +376,7 @@ ${sectionHtml}
 })()
 </script>
 `
+mkdirSync(dirname(out), { recursive: true })
 writeFileSync(out, html)
 const summary = { out, sections: milestones.length, done: total.done, partial: total.partial, todo: total.todo, percent: pct(total), next: nextItem ? headline(splitParts(nextItem.text).lead).head : null }
 console.log(JSON.stringify(summary))

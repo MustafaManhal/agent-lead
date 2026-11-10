@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Mark a checklist item (or one of its inline parts) done, optionally add a note and a progress-log line, and
 // rebuild the checklist page, in one step.
-//   node <tools>/done.mjs "<text the item or part starts with>" [--status x|~| ] [--note "line"] [--log "line"]
+//   node <tools>/done.mjs "<text the item or part starts with>" [--status x|~| ] [--note "line"] [--log "line"] [--first]
 // Finds the first "[ ]" / "[~]" / "[x]" marker followed by that text in the plan and sets it (default x). --note
 // adds an indented line after the item. --log appends to the progress log under today's date (when the config
 // names one). Prints the changed line and the new totals; then republish the page (checklist-page.md).
@@ -13,6 +13,7 @@ const o = options(args)
 const status = o.opt('--status', 'x')
 const note = o.opt('--note')
 const log = o.opt('--log')
+const first = o.flag('--first')
 const text = args[0]
 if (!text) {
   console.error('usage: done.mjs "<item text>" [--status x|~| ] [--note "…"] [--log "…"]')
@@ -27,7 +28,14 @@ const planPath = abs(config.plan)
 const lines = readFileSync(planPath, 'utf8').split('\n')
 const esc = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const re = new RegExp(`\\[( |~|x)\\]( \\*\\*In order:\\*\\*)? ?(${esc})`)
-const at = lines.findIndex((l) => re.test(l))
+const hits = lines.flatMap((l, i) => (re.test(l) ? [i] : []))
+const at = hits[0] ?? -1
+// The same words in two items would tick the wrong one: ask for more of the text instead of guessing.
+if (hits.length > 1 && !first) {
+  console.log(`"${text}" matches ${hits.length} items in ${config.plan}; give more of the text (or --first):`)
+  for (const i of hits.slice(0, 6)) console.log(`  ${config.plan}:${i + 1}: ${lines[i].trim().slice(0, 110)}`)
+  process.exit(1)
+}
 if (at < 0) {
   console.log(`Not found in ${config.plan}: "${text}"`)
   process.exit(1)

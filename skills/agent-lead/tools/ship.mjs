@@ -44,6 +44,15 @@ if (!noPlan) {
 const pageTracked = git('ls-files', '--error-unmatch', config.page.out).status === 0
 git('add', '-A', '--', ...config.commitPaths)
 if (!pageTracked) git('reset', '-q', '--', config.page.out)
+// Staging everything is convenient and risky: never commit secret files, and show what goes in.
+const staged = git('diff', '--cached', '--name-only').out.trim().split('\n').filter(Boolean)
+const secrets = staged.filter((f) => /(^|\/)\.env(\.|$)/.test(f) && !/\.(example|sample|template)$/.test(f))
+if (secrets.length) {
+  git('reset', '-q', '--', ...secrets)
+  console.log(`Not shipped: secret file(s) were about to be committed: ${secrets.join(', ')}. Git-ignore them, then run ship again.`)
+  process.exit(1)
+}
+console.log(`staged ${staged.length} file(s): ${staged.slice(0, 8).join(', ')}${staged.length > 8 ? ', …' : ''}`)
 const trailers = [
   ...coauthors.map((c) => `Co-Authored-By: ${c}`),
   ...(process.env.AGENT_LEAD_COAUTHOR ?? '').split('\n').filter(Boolean).map((c) => (/^[\w-]+:/.test(c) ? c : `Co-Authored-By: ${c}`)),

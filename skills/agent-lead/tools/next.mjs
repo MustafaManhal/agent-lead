@@ -41,7 +41,8 @@ if (!open.length) {
 }
 const it = open[0]
 const where = [it.section, it.sub].filter(Boolean).join(' · ')
-const inSection = open.filter((o) => o.section === it.section)
+// A milestone is the "###" group when the plan has them (the template does), else the "##" section.
+const inSection = open.filter((o) => o.section === it.section && o.sub === it.sub)
 const part = /\[( |~)\]\s*([^[]{8,200})/.exec(it.text)
 
 console.log(`${where} · ${config.plan}:${it.line}`)
