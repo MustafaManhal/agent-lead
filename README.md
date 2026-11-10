@@ -49,7 +49,8 @@ Every later session: run `/lead` again. Pick the workflow (keep the current one 
 
 ## The loop for each item
 
-1. The lead picks the next open item in the implementation plan, in order.
+1. The lead picks the next open item in the implementation plan, in order, and finishes it before another: it stays in the
+   current phase (milestone) until every task of that phase is complete, then starts the next phase the same way.
 2. It writes a self-contained brief: goal, research to do first, what to build, how to check it, the report path.
 3. Handoff: you paste the prompt it gives you into the worker. Pane: it launches the worker and `/agent` opens.
 4. The worker researches, builds, tests, checks in the app, and writes `<brief>.report.md`.

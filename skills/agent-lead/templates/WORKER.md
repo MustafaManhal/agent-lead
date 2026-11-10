@@ -19,6 +19,12 @@ Tools you may use (`<skill>/tools.md`): `next`, `check`, `outline`, `show`, `rep
 right after). Not `ship`, `done` or `land`: they change the plan or commit.
 7. Write the report (below), then stop.
 
+## The focus rule
+Finish the task you are on before anything else. Do the whole brief in the order written (code, tests, checks, report)
+and do not start work outside it, even if something looks tempting. If you run out of budget, write the report with
+exactly what is done and what is left so the next agent continues the same brief. Never leave a half-built item
+without a report.
+
 ## Never
 - Commit, push, merge, rebase, switch branches, or delete branches.
 - Install, remove or upgrade packages. If you need one, say so in the report.

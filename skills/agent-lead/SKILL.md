@@ -56,7 +56,12 @@ The adapter supplies the Codex paths, setup and UI equivalents for the shared wo
 ## 2. The loop for one item (both workflows)
 
 1. **Pick the item** strictly in checklist order (`tools/next.mjs` prints it with the files to read): the first open item, or its first open part. Never skip ahead
-   because something looks easier or more interesting. New findings become new checklist items, not code. Split a
+   because something looks easier or more interesting. **Finish before you move on:** stay in the phase (milestone)
+   you are in. Every task of that phase must be complete before any task of the next phase starts, then repeat the
+   same process in the next phase. A task is complete when its code, tests, checks and report are done and reviewed,
+   not when it is "mostly there". If a task can only be closed by something the lead cannot do (a check on another
+   OS, an owner account), mark it partial with the open check named in its note, tell the user exactly what to do,
+   and say that it is the only thing left in that task. New findings become new checklist items, not code. Split a
    big item into parts a, b, c in the checklist first (one commit per part) and show the user the split.
 2. **Prepare just enough** to write a precise brief: the relevant files (declarations and the parts you need, not
    whole large files), the project docs it touches, and any reference the work must match (a design, an API, a spec,
@@ -145,6 +150,10 @@ A quota limit, a crash or a refused command can end a run. Look at the worker's 
 
 - The checklist is the single source of truth for status. Keep it current.
 - One worker on one item at a time.
+- **Finish the task, then the phase.** Complete the task you are on before another one; stay in the phase you are in; only
+  when every task of that phase is complete start the next phase (this is a standing instruction from the user).
+  Never hand a worker an item from a later phase while the current phase has open items. When a worker stops early,
+  the next worker **continues the same brief** from the diff; it does not get a new one.
 - Secrets never go in a brief, a report, a commit or a log. The worker's checkout gets no secret files unless the
   user says so.
 - A brief never asks the worker to act on outside services the user has not approved (publishing, sending,

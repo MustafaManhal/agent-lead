@@ -9,5 +9,7 @@ This project is built by a lead agent and a worker agent.
   follow it: build, test, check in the app, write the report next to the brief, never commit.
 - **Otherwise, if you are Claude Code or the user asks you to lead**, run `/lead` (agent-lead plugin) or read
   `.agent-lead/LEAD.md` first.
+- **Finish the task you are on before moving to another one**, and finish every task of the current phase before the next
+  phase starts. Workers complete their whole brief, then report.
 - The product docs are in `<docs folder>`: 01-PRD, 02-TRD, 03-UI-UX, 04-app-flow, 05-backend-schema,
   06-implementation-plan (the checklist).

@@ -54,6 +54,12 @@ facts. Keep section 8 current.
 - Never push, deploy or publish unless the user asks.
 - Project rules that briefs must repeat: <design tokens, accessibility level, languages, no new dependencies…>.
 
+## 5b. The focus rule (finish before you move on)
+Complete the task you are on before moving to another one. Stay in the phase (milestone) you are in. Only after every
+task of that phase is complete may the next phase start, then repeat. Briefs come from the lowest phase that still has
+an open task. A worker finishes its whole brief before it gets another; when it stops early the next agent continues the
+same brief. Before moving on, re-read the phase's items and confirm each is done, or partial with the open check named.
+
 ## 6. Review focus for this project
 <What matters most here: UI screenshots at phone and desktop, API contracts, migrations, accuracy bars, etc.>
 
