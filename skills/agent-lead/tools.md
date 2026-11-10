@@ -74,7 +74,7 @@ this bridges HTML, plain text and PNG between the browser and the macOS pasteboa
 | `macos/ax-tree.swift <pid> [max]` | Reads a macOS app's accessibility tree, window by window plus the menu bar, as JSON lines (role, name, value, enabled, frame). Reads in the background; `--foreground` explicitly switches to another Space when that is needed. Requires Accessibility permission for the app running the command. |
 | `macos/ax-enable.swift <pid>` | Turns on an Electron app's accessibility tree so tools can read and press its controls. |
 
-The app scanner (`scan.mjs`) moved to its own repo, scan-tool; install it separately when a project matches an existing app.
+The app scanner (`scan.mjs`) moved to its own repo, [scan-tool](https://github.com/MustafaManhal/scan-tool); install it separately when a project matches an existing app.
 
 ## Research and shared resources
 

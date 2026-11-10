@@ -26,6 +26,8 @@ and `claude plugin validate .`. For browser changes, also run
 `AGENT_LEAD_PLAYWRIGHT_ROOT=<project-with-playwright> node --test tests/browser-background.test.mjs tests/browser-pipe.test.mjs`. `tests/codex.test.mjs` uses temporary runtime/skill directories and fake workers;
 it never starts a paid agent or changes the user's config. Test plugin discovery with `codex plugin list --available --json`.
 
+The app scanner that used to be `tools/scan.mjs` is now a separate repo: https://github.com/MustafaManhal/scan-tool.
+
 ## The parts
 
 | Part | Where | Job |

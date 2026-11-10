@@ -205,6 +205,11 @@ run it by hand: `bash ~/.claude/plugins/marketplaces/agent-lead/skills/agent-lea
 
 Handoff mode needs no setup.
 
+## Scanning a reference app
+
+The app scanner (`scan.mjs`: crawls an existing app into screens, controls, styles and tokens an agent can read)
+lives in its own repo: [scan-tool](https://github.com/MustafaManhal/scan-tool). Clone it next to this plugin when a project matches an existing app.
+
 ## Full and Light tracks
 
 - **Full**: the six docs, for a new product or anything with accounts, payments or stored user data.
