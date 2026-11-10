@@ -69,33 +69,10 @@ Every later session: run `/lead` again. Pick the workflow (keep the current one 
 | Templates | The six docs, `LEAD.md`, `WORKER.md`, `brief.md`, `review-round.md`, `status.md`, `decisions.md`, an `AGENTS.md` pointer section, allow lists. |
 | Checklist page | Every project gets one (you are asked once): the plan as a page with overall progress, the next item, milestone cards that fold away when done, Details for long notes, Expand all / Collapse all / Hide done, light and dark, phone-friendly. Published privately with the Artifact tool to one link that stays the same, or kept as a local file. Rebuilt after every checklist change. Built by `plan-page.mjs`. |
 | `/agent` pane | Live view of a Pane-mode run: each file read or written, each command with its exit code, refused commands in red, the reply, time and tokens. Opens by itself; `/agent close` hides it. `/agy` still works. |
-| App scan (`tools/scan.mjs`) | Crawls visible screens and safe UI states, captures their controls, styles, text and screenshots, and can add route/API findings from REA. A plan can set up several starting states. |
 | Tools (`skills/agent-lead/tools/`) | Small commands that work in any project, configured by one optional `.agent-lead/config.json` (detected when missing): `next` (the next item with the files to read), `check` (typecheck, lint, tests in one line), `done` and `ship` (mark the plan, rebuild the page, commit with the worker's credit), `land` (merge with compact conflicts); `outline`, `show`, `rep`, `snippet` (read and edit code cheaply); `play` (real input through Playwright), `observe` (a reference product in a browser that stays signed in), `audit-ui` (overflow, tap targets and contrast at nine widths); `research.py`, `ask` (offload to a cheaper model), `lock` (shared resources between parallel workers); macOS helpers for windows, input and the clipboard. See `skills/agent-lead/tools.md`. |
 | `agent-run`, `run-agent.sh` | Launch a worker CLI headless with per-run limits and record it for the pane. |
 | `hooks/first-run.sh` | Sets the plugin up on the first session after install or update: `/lead` (`install-lead.sh`) and the Pane-mode scripts (`setup.sh`). |
 
-
-## Scanning an app
-
-Start the observe browser with `node <skill>/tools/observe.mjs start --url <app-url>`. Sign in by hand in that browser. Then run one scan:
-
-```sh
-node <skill>/tools/scan.mjs https://app.example
-```
-
-Or run a plan when each starting state needs its own setup:
-
-```sh
-node <skill>/tools/scan.mjs --plan .agent-lead/scan.json
-```
-
-The default output is `.agent-lead/scan/<host>/`. Read `INDEX.md` first; it links to `features.md`, the full `states.md` table, `tokens.md`, `strings.txt`, and each run's controls, styles and screenshots. REA can add `routes.md` and `api.md`.
-
-The scan avoids names on its built-in never-click list, including Delete, Share, Publish, Invite, payment/account actions, and collaboration actions such as Spotlight, Follow, Observe and Present to. It also avoids action verbs in full mode. `--skip <regex>` adds names to the never-click list. `--allow <regex>` permits selected action names in full mode, but does not override the destructive-name list. Use a scratch document or test account when allowing changes. `--undo <keys>` lets recovery undo document changes made by allowed actions.
-
-A plan can set `ready` and `setup` for each run. Readiness is checked after navigation or reload; setup runs after loads to restore the intended UI state. Probes capture scripted pointer/keyboard steps for interactions without a suitable control. `--lock <name>` holds a shared-resource lock for the scan. `--recycle <n>` opens a fresh tab after a number of reloads; `--tab-minutes <n>` replaces an old tab when returning to a state. `--parallel` runs plan entries in separate windows, but do not use it for a shared multiplayer document because the sessions can affect each other.
-
-For a macOS app, use `--native "App name"`. The app running the command needs Accessibility permission in System Settings → Privacy & Security → Accessibility.
 
 ## Install
 

@@ -21,10 +21,9 @@ settings. The hook passes `--skills` to install the short aliases too. `agent-vi
 the installed viewer); Node.js 22.18+ can execute its erasable TypeScript. The Claude parser and UI stay shared.
 Codex uses a terminal viewer in place of a custom side pane and a separate log under its runtime directory.
 
-Validate changes with `node --test tests/codex.test.mjs tests/scan/core.test.mjs tests/scan/mcp-client.test.mjs`
+Validate changes with `node --test tests/codex.test.mjs tests/loop.test.mjs`
 and `claude plugin validate .`. For browser changes, also run
-`AGENT_LEAD_PLAYWRIGHT_ROOT=<project-with-playwright> node --test tests/browser-background.test.mjs tests/browser-pipe.test.mjs tests/scan/fixture.test.mjs`
-(the local scan fixture currently uses the Figmu test environment). `tests/codex.test.mjs` uses temporary runtime/skill directories and fake workers;
+`AGENT_LEAD_PLAYWRIGHT_ROOT=<project-with-playwright> node --test tests/browser-background.test.mjs tests/browser-pipe.test.mjs`. `tests/codex.test.mjs` uses temporary runtime/skill directories and fake workers;
 it never starts a paid agent or changes the user's config. Test plugin discovery with `codex plugin list --available --json`.
 
 ## The parts

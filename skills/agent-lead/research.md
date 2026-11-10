@@ -16,9 +16,8 @@ It never copies other people's code, images, icons or text into the product.
 
 ## Matching an existing app
 
-Run `tools/scan.mjs` once (or `--plan` with several setups) before writing docs or briefs. Its `INDEX.md` is the
-entry point; briefs cite state folders (`runs/<run>/states/<id>-…/`) and `ui.txt` lines instead of asking the
-worker to look again. Rescan after the app changes.
+Capture the reference once before writing docs or briefs (`observe.mjs`, or the separate app-scan tool for a full
+crawl) and save it under `research/`; briefs cite those files instead of asking the worker to look again.
 
 ## Rules
 

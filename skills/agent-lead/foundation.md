@@ -44,10 +44,10 @@ user should give; list it as an open question instead.
 
 ## Phase 2. Research (see `research.md` for how)
 
-When the project matches or rebuilds an existing app, start with a full scan of it (`tools/scan.mjs`, see
-`tools.md`): the user signs in once in `observe`'s browser, then one run captures every screen, control, text,
-style, route and endpoint into `research/scan/<app>/`. Every later doc, brief and review points at that folder
-instead of taking new screenshots. Keep it out of git when it is large; note its path in LEAD.md.
+When the project matches or rebuilds an existing app, capture it first: `observe.mjs` for its screens, controls and
+measurements (or the separate app-scan tool for a full crawl), saved under `research/`. Later docs, briefs and
+reviews point at that folder instead of taking new screenshots. Keep it out of git when it is large; note its path
+in LEAD.md.
 
 Cheap, focused, with sources. Typical topics:
 

@@ -66,14 +66,15 @@ this bridges HTML, plain text and PNG between the browser and the macOS pasteboa
 | --- | --- |
 | `play.mjs [--url u] [--ready js] step…` | Drives the running app with real pointer and keyboard input through Playwright: `js:`, `click:`, `drag:`, `move:`, `key:`, `type:`, `tap:role:name`, `text:`, `ui`, `wait:`, `shot:`. Fresh browser each run; prints page errors. |
 | `observe.mjs start` then `observe.mjs step…` | A browser that stays open on a reference product, with its own profile (a sign-in the user does once is kept): `ui`, `aria`, `measure:`, `tap:`, `hover:`, `menu:`, `pick:`, `fill:`, `shot:`, `shotui:`, `js:` and real input. Steps refuse to run once the tab leaves the reference site. `endpoint` prints the CDP address for other tools. |
-| `scan.mjs [url] [--plan scan.json]` | Crawls pages and visible UI states (menus, tabs, dialogs, panels, popovers, context menus), hovers eligible icon controls for tooltips, and records styles, text, screenshots and scrollable content. REA can add route/API findings. Output includes a short `INDEX.md` (read first), `states.md`, `features.md`, `tokens.md`, `strings.txt`, `routes.md`, `api.md`, and per-state `ui.txt`, `ui.json`, screenshots and crops. A plan runs configured setups in series; `--parallel` uses separate windows and is unsafe for shared multiplayer documents. `--lock` holds a named resource lock. The user signs in through the observe browser. |
 | `measure.js` | Browser snippet behind `observe`'s `measure:` step: `measureUI(label)` (sizes, colors, radii, fonts around a label) and `uiMap()` (every control as text). Paste it into any page's console too. |
 | `audit-ui.mjs [--url u] [--routes "/,/x"] [--dark]` | Overflow at nine widths (320–1440 px), tap targets under 44 px on a phone, and rendered text contrast under WCAG AA, on every route. Needs only Chrome. |
 | `macos/windows.swift "<app>"` | An app's windows (pid, id, title, frame) as JSON lines. |
 | `macos/input.swift --pid <pid> click\|drag\|key …` | Real input for native and Electron apps; refuses unless that app is frontmost. |
 | `macos/clip.swift set\|get\|types` | The clipboard as HTML or text, to check copy and paste between your app and another. |
-| `macos/ax-tree.swift <pid> [max]` | Reads a macOS app's accessibility tree, window by window plus the menu bar, as JSON lines (role, name, value, enabled, frame). Reads in the background; `--foreground` explicitly switches to another Space when that is needed. Requires Accessibility permission for the app running the command. Used by `scan.mjs --native`. |
+| `macos/ax-tree.swift <pid> [max]` | Reads a macOS app's accessibility tree, window by window plus the menu bar, as JSON lines (role, name, value, enabled, frame). Reads in the background; `--foreground` explicitly switches to another Space when that is needed. Requires Accessibility permission for the app running the command. |
 | `macos/ax-enable.swift <pid>` | Turns on an Electron app's accessibility tree so tools can read and press its controls. |
+
+The app scanner (`scan.mjs`) moved to its own repo, app-scan; install it separately when a project matches an existing app.
 
 ## Research and shared resources
 
