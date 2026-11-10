@@ -21,6 +21,17 @@ Tools you may use (`<skill>/tools.md`): `next`, `check`, `outline`, `show`, `rep
 right after). Not `ship`, `done` or `land`: they change the plan or commit.
 7. Write the report (below), then stop.
 
+## Security (always, even when the brief does not say it)
+- Validate and limit user input on the server, not only in the UI. Parameterize every query; never build SQL, shell
+  commands or HTML from strings that contain input.
+- Check who is asking on every new endpoint and action: signed in, and owner of the thing they touch.
+- No secrets, keys or tokens in code, tests, logs or the report. Read them from the environment by name.
+- Escape output; no raw HTML from user content. Do not log personal data.
+
+## Parallel work
+Other workers may be running in other checkouts. Stay inside the files your brief lists under "Files". Use the port
+in `$AGENT_LEAD_PORT` for your dev server when it is set. Take a lock (`lock.mjs`) before a shared resource.
+
 ## The focus rule
 Finish the task you are on before anything else. Do the whole brief in the order written (code, tests, checks, report)
 and do not start work outside it, even if something looks tempting. If you run out of budget, write the report with

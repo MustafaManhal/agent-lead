@@ -5,14 +5,15 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 let log = process.env.AGENT_LEAD_LOG || join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'agent-runs/live.log')
-let watch = false, json = false
+let watch = false, json = false, all = false
 const args = process.argv.slice(2)
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--watch') watch = true
   else if (args[i] === '--json') json = true
+  else if (args[i] === '--all') all = true
   else if (args[i] === '--log' && args[i + 1]) log = args[++i]
   else {
-    console.error('usage: agent-view.mjs [--log <path>] [--json | --watch]')
+    console.error('usage: agent-view.mjs [--log <path>] [--json | --watch | --all]')
     process.exit(2)
   }
 }
@@ -68,6 +69,21 @@ try {
   }
   process.once('SIGINT', () => { clearTimeout(timer); process.exit(0) })
   process.once('SIGTERM', () => { clearTimeout(timer); process.exit(0) })
+  if (all) {
+    // One line per worker: the main log and every named worker's log beside it (runs/<name>.log).
+    const { readdir, readFile } = await import('node:fs/promises')
+    const { dirname, basename } = await import('node:path')
+    const dir = join(dirname(log), 'runs')
+    const logs = [log, ...(await readdir(dir).catch(() => [])).filter(f => f.endsWith('.log')).map(f => join(dir, f))]
+    for (const file of logs) {
+      const info = await stat(file).catch(() => null)
+      if (!info) continue
+      const v = parseRun(await readFile(file, 'utf8'), info.mtimeMs, Date.now())
+      const state = v.status === 'done' && v.exitCode === null ? 'stale' : v.status
+      console.log(clean(`${file === log ? 'main' : basename(file, '.log')}  ${v.agent || 'worker'}  ${state}${v.exitCode !== null ? ` exit ${v.exitCode}` : ''}  ${v.seconds}s  ${v.tokens} tokens  ${v.denied} denied  ${v.conversationId || ''}`))
+    }
+    process.exit(0)
+  }
   await render()
 } catch (error) {
   console.error(`agent-view: ${error.message}. The viewer requires Node.js 22.18 or newer.`)

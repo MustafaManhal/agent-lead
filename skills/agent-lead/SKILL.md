@@ -29,7 +29,7 @@ Files in this skill (read the one you need, when you need it):
 | `clis.md` | Flags, resume options and rules files of each worker CLI. |
 | `templates/` | `docs/01-PRD.md` … `docs/06-implementation-plan.md`, `LEAD.md`, `WORKER.md`, `brief.md`, `review-round.md`, `status.md`, `decisions.md`, `AGENTS.md` (pointer section), `allow-lists.md`. |
 | `checklist-page.md` | The checklist page every project gets: asking the user once, building it with `plan-page.mjs`, publishing it to one link and republishing after every checklist change. |
-| `tools.md` and `tools/` | Command-line tools for every project: `next`, `check`, `done`, `ship`, `land` for the item loop; `outline`, `show`, `rep`, `snippet` for cheap code reading; `play`, `observe`, `audit-ui` and macOS helpers for seeing the app and the product it matches; `research`, `ask`, `lock`. Set them up during project setup. |
+| `tools.md` and `tools/` | Command-line tools for every project: `next`, `check`, `done`, `ship`, `land` for the item loop; `outline`, `show`, `rep`, `snippet` for cheap code reading; `play`, `observe`, `audit-ui` and macOS helpers for seeing the app and the product it matches; `research`, `ask`, `lock`; `verify` (the mechanical review), `map` (repo map), `worker` (parallel workers), `intake` (issues into the plan), `handoff` (session handoff). Set them up during project setup. |
 | `plan-page.mjs` | Builds the checklist page from the plan: `node <skill>/plan-page.mjs <plan.md> .agent-lead/checklist.html --title "…"`. |
 | `worker-rules.md` | The rules `agent-run` puts in front of every Pane brief (headless, allow-listed commands). |
 
@@ -39,6 +39,8 @@ In Codex, read `workflows/codex.md` first. Use `/lead` in the desktop skill menu
 The Agent skill (`/agent` in the desktop menu or `$agent`) inspects worker status.
 The adapter supplies the Codex paths, setup and UI equivalents for the shared workflow below.
 
+- **`.agent-lead/handoff.md` exists**: read it first. It is the short, generated state of the project (next item,
+  last ships, open briefs, workers); open LEAD.md for the fixed facts and skip what the handoff already answers.
 - **`.agent-lead/LEAD.md` exists** in the project (or in the lead checkout it names): read it fully, then do its
   "Start of every session" steps. It holds the workflow, the worker, every path, the commands, the conventions and
   the current state. Tell the user in two or three lines where things stand and what comes next, with the checklist
@@ -66,17 +68,23 @@ The adapter supplies the Codex paths, setup and UI equivalents for the shared wo
    config, one file, no data or auth) or `{hard}`; the tag picks the worker model (LEAD.md section 1) and the review
    depth (`review.md`). Split a
    big item into parts a, b, c in the checklist first (one commit per part) and show the user the split.
-2. **Prepare just enough** to write a precise brief: the relevant files (declarations and the parts you need, not
-   whole large files), the project docs it touches, and any reference the work must match (a design, an API, a spec,
+2. **Prepare just enough** to write a precise brief: the relevant files, found through `.agent-lead/repo-map.md`
+   (`tools/map.mjs`) rather than by searching (declarations and the parts you need, not whole large files), the project docs it touches, and any reference the work must match (a design, an API, a spec,
    another product's behaviour). Leave the full investigation to the worker. Hand long pages or files
    you only need a few facts from to the cheaper model (`tools/ask.mjs`) instead of reading them yourself.
 3. **Write the brief** from `templates/brief.md` into `.agent-lead/briefs/<NN>-<item>.md`. It must stand on its own:
    the worker has not seen this conversation. Point it at the docs sections it implements (FR numbers, screens,
-   flows, tables), the research to do first, the in-app check, and the report path.
+   flows, tables), the research to do first, the in-app check, and the report path. List the files and folders the worker may touch
+   under `## Files`: `verify.mjs` holds the worker to them, and parallel workers must not share any. For a `{hard}`
+   item with real logic, make it **tests first**: this brief asks only for failing tests written from the spec;
+   you check them (`verify.mjs <brief> --tests-only` records them), then a round asks for the code that makes them
+   pass. After that, `verify.mjs` fails if the build round edits those tests.
 4. **Hand it over.** Pane: launch it (`workflows/pane.md`). Handoff: give the user the paste-ready prompt in its own
    code block (`workflows/handoff.md`).
-5. **Review** when the worker finishes (Pane: the run ends; Handoff: the user says "report ready"). Follow
-   `review.md`. Never take the report on trust.
+5. **Review** when the worker finishes (Pane: the run ends; Handoff: the user says "report ready"). Run
+   `tools/verify.mjs <brief>` in the worker's checkout first: it costs no tokens and its FAIL lines are the review
+   round. In Pane mode `agent-run` has already sent failing checks back to the worker up to two times (`RETRY`
+   lines). Then follow `review.md`. Never take the report on trust.
 6. **Not good yet**: write a review round `<brief>-2.md` (then `-3`…) from `templates/review-round.md` and hand it
    over the same way. The worker adds a "Round N" section to the same report.
 7. **Good**: ship (section 3), then pick the next item.
@@ -104,6 +112,9 @@ round. Say so in the checklist note and to the user.
    go out with the next ship, not as a publish of their own.
 8. Tell the user what landed, which checklist items changed, the new totals, the next item and the checklist page
    link. In Handoff mode, end with the next prompt in its own code block.
+
+`ship.mjs` also rebuilds the repo map and writes `.agent-lead/handoff.md`. In a long session, after a ship is the
+place to clear your context and continue from the handoff file: nothing you need is only in the conversation.
 
 Never push, open a pull request, deploy or publish unless the user asks for that action.
 
@@ -143,6 +154,24 @@ the lead checkout while the worker works:
   (`git stash push -u -m "<tag>"`, note the SHA, `git stash apply <sha>`, then drop that entry by its tag). Never a
   bare `git stash` or `git stash pop`: other sessions share the stash list.
 
+## 6b. Parallel workers (only when the user asks)
+
+Several workers at once, in any tool. `tools/worker.mjs add <name>` gives each one its own worktree, branch, port
+and run log; `worker.mjs list` shows them with their state (running, stale, done).
+
+- Give parallel workers items that touch different files, from the same phase. Each brief's `## Files` section is
+  the contract: no path appears in two running briefs. Shared resources (one browser tab, a test database) go
+  through `lock.mjs`.
+- Pane: `agent-run <cli> <brief> --cd <worker path>` once per worker (start them in the background); a registered
+  worktree gets its log (`runs/<name>.log`) and `AGENT_LEAD_PORT` on its own. `/agent <name>` shows one worker,
+  `agent-view.mjs --all` one line per worker. Handoff: give one prompt per worker, each with its own checkout path;
+  the user pastes them into whatever tool they use.
+- Review and land one worker at a time, in checklist order: `verify`, review, `ship` in that worktree, `land` its
+  branch, then fast-forward the other workers' checkouts when they are clean.
+- A stale worker (silent for two minutes with no end line) crashed or ran out: treat it as section 7.
+- Three workers is the default limit (`maxWorkers`). More workers spend more quota and merge worse; they do not
+  finish a phase faster when its items depend on each other.
+
 ## 7. When the worker stops early
 
 A quota limit, a crash or a refused command can end a run. Look at the worker's checkout first:
@@ -159,7 +188,7 @@ A quota limit, a crash or a refused command can end a run. Look at the worker's 
 ## 8. Rules that hold everywhere
 
 - The checklist is the single source of truth for status. Keep it current.
-- One worker on one item at a time.
+- One worker per item, and one item per worker. Several workers at once only when the user asks (section 6b).
 - **Finish the task, then the phase.** Complete the task you are on before another one; stay in the phase you are in; only
   when every task of that phase is complete start the next phase (this is a standing instruction from the user).
   Never hand a worker an item from a later phase while the current phase has open items. When a worker stops early,

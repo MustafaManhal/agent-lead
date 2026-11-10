@@ -45,6 +45,14 @@ The worker CLI must be installed and signed in. If it is not, tell the user. Do 
 Pick `--model` from the item's size tag and LEAD.md section 1 (`{easy}` → the cheaper model). If the run stops on
 quota, run the same brief with the next worker of the chain (SKILL.md section 7).
 
+After a run that exits cleanly, `agent-run` runs the project's checks. If they fail it sends the failing lines back
+to the same session, up to two times (`RETRY` lines; `AGENT_LEAD_RETRIES=0` turns it off), then prints `CHECKS OK …`
+or `CHECKS FAIL`. You review only after that.
+
+Parallel workers: `--name <worker>` (or a worktree registered with `worker.mjs add`) writes the run to
+`~/.claude/agent-runs/runs/<name>.log` and sets `AGENT_LEAD_PORT`. `/agent <name>` shows that worker;
+`node ~/.claude/agent-runs/agent-view.mjs --log ~/.claude/agent-runs/live.log --all` prints one line per worker.
+
 ## Review rounds
 
 Send fixes to the same session so it keeps its context:
@@ -67,7 +75,8 @@ add the exact commands the task needs to `AGENT_LEAD_ALLOW`. Say in LEAD.md whic
 - Some workers refuse commands with square brackets (`git diff app/[id]/page.tsx`): tell them to run `git diff` with
   no path.
 - Workers sometimes read files through the shell (`sed`, `python`): the rules forbid it; keep that line.
-- The pane reads `~/.claude/agent-runs/live.log`, overwritten by each run, so it shows one run at a time. A run
-  started any other way does not show.
+- The pane reads `~/.claude/agent-runs/live.log` and the named workers' logs in `runs/`, and follows the newest one
+  unless `/agent <name>` pins it. Each log is overwritten by that worker's next run. A run started any other way
+  does not show.
 - Features that need server keys behave differently in a worktree without `.env` files. Check them in the lead
   checkout after merging.

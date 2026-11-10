@@ -77,13 +77,15 @@ when it ran; ask it only when the skill was started without `/lead`.
   WORKER.md      the worker's rules for this project (templates/WORKER.md, filled)  commit
   briefs/        briefs, review rounds and worker reports                           git-ignored
   checklist.html the checklist page, built by plan-page.mjs (checklist-page.md)  git-ignored
+  handoff.md     the generated session handoff (handoff.mjs, after every ship)   git-ignored
+  repo-map.md    the generated repo map (map.mjs, rebuilt by ship)               commit
 ```
 
 - Fill LEAD.md completely: workflow, worker and model, every absolute path (lead checkout, worker checkout, briefs
   folder, checklist), the commands from step 1, the commit style, the review checks that matter for this project
   (UI screenshots, API contract tests, migrations, accessibility…), the checklist page (URL, local, or declined with
   the date), and the current state. A new session must be able to continue from it alone.
-- Git-ignore `briefs/` and `checklist.html` locally: add `.agent-lead/briefs/` and `.agent-lead/checklist.html` to
+- Git-ignore `briefs/` and `checklist.html` locally: add `.agent-lead/briefs/`, `.agent-lead/checklist.html` and `.agent-lead/handoff.md` to
   `.git/info/exclude` (shared by every worktree), not to `.gitignore`, unless the user wants it in the repo.
 - Point the agents at the files:
   - Lead sessions: add to the project's `CLAUDE.md` (create it if missing) a short section: "Lead sessions: run
@@ -102,7 +104,8 @@ when it ran; ask it only when the skill was started without `/lead`.
 
 Set up the command-line tools (`tools.md`): run `node <skill>/tools/check.mjs` in the project; if it does not
 find the right checks, or the plan is not where it looks, write `.agent-lead/config.json` from
-`tools/config.example.json` with only the keys that differ. Put the tool commands, with the full `<skill>` path, in
+`tools/config.example.json` with only the keys that differ. Run `node <skill>/tools/map.mjs` once so the project has a repo map (ship keeps it current). If the user tracks work
+in GitHub issues, `intake.mjs --dry` shows what would join the plan. Put the tool commands, with the full `<skill>` path, in
 LEAD.md section 4 and WORKER.md, so every session and every worker uses the same ones. When the project matches a
 reference product, set `reference` and tell the user that `observe.mjs start` opens a separate browser where they
 sign in once.

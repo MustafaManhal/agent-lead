@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs a coding agent CLI as a worker, safely, and shows it live in the /agent pane.
 #
-#   agent-run <cli> <brief-file> [--cd <dir>] [--resume <session-id>] [--model <model>]
+#   agent-run <cli> <brief-file> [--cd <dir>] [--resume <session-id>] [--model <model>] [--name <worker>]
 #
 # <cli>: agy, claude, codex, gemini, qwen, opencode, cursor. For any other CLI use run-agent.sh.
 # The built-in worker rules are put in front of the brief, and each CLI gets per-run safety
@@ -12,7 +12,7 @@
 set -uo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-usage() { echo "usage: agent-run <agy|claude|codex|gemini|qwen|opencode|cursor> <brief-file> [--cd <dir>] [--resume <id>] [--model <model>]" >&2; exit 2; }
+usage() { echo "usage: agent-run <agy|claude|codex|gemini|qwen|opencode|cursor> <brief-file> [--cd <dir>] [--resume <id>] [--model <model>] [--name <worker>]" >&2; exit 2; }
 [ "$#" -ge 2 ] || usage
 
 cli="$1"
@@ -21,11 +21,13 @@ shift 2
 dir=""
 resume=""
 model=""
+name=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --cd) [ "$#" -ge 2 ] || usage; dir="$2"; shift 2 ;;
     --resume) [ "$#" -ge 2 ] || usage; resume="$2"; shift 2 ;;
     --model) [ "$#" -ge 2 ] || usage; model="$2"; shift 2 ;;
+    --name) [ "$#" -ge 2 ] || usage; name="$2"; shift 2 ;;
     *) usage ;;
   esac
 done
@@ -49,10 +51,23 @@ if [ -n "$pm" ]; then
   for s in test lint typecheck build; do safe+=("$pm $s" "$pm run $s"); done
 fi
 # The read-only agent-lead tools WORKER.md tells the worker to use (setup records where they live).
-tools="${AGENT_LEAD_TOOLS:-}"
-if [ -z "$tools" ] && [ -f "$here/tools-path" ]; then tools="$(cat "$here/tools-path")"; fi
-if [ -n "$tools" ] && [ -d "$tools" ]; then
-  for t in check next outline show; do safe+=("node $tools/$t.mjs"); done
+tooldir="${AGENT_LEAD_TOOLS:-}"
+if [ -z "$tooldir" ] && [ -f "$here/tools-path" ]; then tooldir="$(cat "$here/tools-path")"; fi
+if [ -n "$tooldir" ] && [ -d "$tooldir" ]; then
+  for t in check next outline show; do safe+=("node $tooldir/$t.mjs"); done
+fi
+# Parallel workers: a worktree registered with worker.mjs (or --name) gets its own run log and its own port, so
+# several workers never share a log or a dev-server port.
+if [ -n "$tooldir" ] && [ -f "$tooldir/worker.mjs" ] && command -v node >/dev/null; then
+  me="$(node "$tooldir/worker.mjs" here 2>/dev/null || true)"
+  if [ -n "$me" ]; then
+    [ -n "$name" ] || name="${me%% *}"
+    export AGENT_LEAD_PORT="${me##* }" PORT="${me##* }"
+  fi
+fi
+if [ -n "$name" ] && [ -z "${AGENT_LEAD_NAMED:-}" ]; then
+  export AGENT_LEAD_LOG="$(dirname "${AGENT_LEAD_LOG:-$HOME/.claude/agent-runs/live.log}")/runs/$name.log"
+  export AGENT_LEAD_NAMED=1
 fi
 if [ -n "${AGENT_LEAD_ALLOW:-}" ]; then IFS=',' read -r -a extra <<< "$AGENT_LEAD_ALLOW"; safe+=("${extra[@]}"); fi
 
@@ -131,6 +146,26 @@ if [ -f "$here/agent-view.mjs" ] && command -v node >/dev/null; then
   if [ -n "$usage" ]; then
     echo "USAGE $cli ${model:-default} $usage"
     printf '%s\t%s\t%s\t%s\texit=%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M')" "$cli" "${model:-default}" "$usage" "$code" "$PWD" "$(basename "$brief")" >> "$here/usage.log" 2>/dev/null || true
+  fi
+fi
+# Checks failing right after a run are the cheapest review round there is: send the failure back to the same
+# session before the lead spends anything on it. AGENT_LEAD_RETRIES (default 2; 0 turns it off).
+left="${AGENT_LEAD_RETRIES:-2}"
+if [ "$code" -eq 0 ] && [ -n "$tooldir" ] && [ -f "$tooldir/check.mjs" ] && command -v node >/dev/null; then
+  checks="$(node "$tooldir/check.mjs" 2>&1)"
+  cs=$?
+  if [ "$cs" -eq 0 ]; then
+    echo "CHECKS $checks"
+  elif [ "$cs" -eq 1 ] && [ "$left" -gt 0 ] && [ -n "$session" ]; then
+    fix="$(mktemp "${TMPDIR:-/tmp}/agent-lead-fix.XXXXXX")"
+    printf 'The project checks fail after your change. Fix only what makes them fail, do not weaken or delete tests, then update the report (check output included). The failing output:\n\n%s\n' "$checks" > "$fix"
+    echo "RETRY checks failing; sent back to the same session ($left left)"
+    AGENT_LEAD_RETRIES=$((left - 1)) bash "${BASH_SOURCE[0]}" "$cli" "$fix" --resume "$session" ${model:+--model "$model"} ${name:+--name "$name"}
+    code=$?
+    rm -f "$fix"
+  elif [ "$cs" -eq 1 ]; then
+    echo "CHECKS FAIL (no retries left): write a review round"
+    echo "$checks" | head -12
   fi
 fi
 exit "$code"

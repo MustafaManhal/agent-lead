@@ -5,6 +5,8 @@ import { EMPTY, STALE_MS, parseRun } from './parse'
 
 // The lead pipes every run here (see the agent-lead skill). The old agy-only path is still read.
 const LOGS = ['.claude/agent-runs/live.log', '.claude/agy-runs/live.ndjson']
+// Named (parallel) workers write here, one log each: runs/<name>.log.
+const RUNS = '.claude/agent-runs/runs'
 const PANE = 'agent-lead'
 const TITLE = 'agent live'
 const OPEN = { id: PANE, title: TITLE, closeOnEscape: true } as const
@@ -16,6 +18,8 @@ const view = atom({ plugin: 'agent-lead', key: 'view' } as const, EMPTY, {
 export const register: Register = on => {
   let home = ''
   let isPolling = false
+  // `/agent <name>` pins the pane to one worker's log; `/agent` alone follows the newest run again.
+  let pinned = ''
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
@@ -37,7 +41,15 @@ export const register: Register = on => {
         // The newest of the log files is the current run.
         let path = ''
         let mtimeMs = 0
-        for (const log of LOGS) {
+        let named: string[] = []
+        try {
+          const ls = await $.process.run(['ls', `${home}/${RUNS}`])
+          named = ls.stdout.split('\n').filter(name => name.endsWith('.log')).map(name => `${RUNS}/${name}`)
+        } catch {
+          // No parallel workers yet.
+        }
+        const logs = pinned && named.includes(`${RUNS}/${pinned}.log`) ? [`${RUNS}/${pinned}.log`] : [...LOGS, ...named]
+        for (const log of logs) {
           const candidate = `${home}/${log}`
           if (!(await $.fs.exists(candidate))) continue
           const stat = await $.fs.stat(candidate)
@@ -74,9 +86,10 @@ export const register: Register = on => {
         await $.ui.close({ id: PANE })
         return { text: 'Agent live pane closed.' }
       }
+      pinned = e.args.trim().replace(/[^\w-]/g, '')
       await $.ui.open(OPEN)
 
-      return { text: 'Agent live pane opened. /agent close hides it.' }
+      return { text: pinned ? `Agent live pane opened on worker ${pinned}. /agent alone follows the newest run.` : 'Agent live pane opened. /agent <name> shows one worker; /agent close hides it.' }
     })
   }
 

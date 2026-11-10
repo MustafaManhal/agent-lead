@@ -35,6 +35,13 @@ session"). Use absolute paths: the worker's working folder differs from yours.
    - Review (`review.md`).
 4. Then either give the review-round prompt, or ship (SKILL.md section 3) and give the next item's prompt.
 
+## Several workers at once
+
+When the user asks for parallel workers, create each checkout with `node <skill>/tools/worker.mjs add <name>` (or
+adopt one their tool made: `--path <dir>`), write one brief per worker with separate `## Files`, and give one
+prompt per worker, each naming its own checkout. `worker.mjs list` shows which have uncommitted work. Review and
+land them one at a time (SKILL.md section 6b).
+
 ## Keeping the worker's checkout right
 
 - After you land an item, fast-forward the worker's checkout to the lead branch (`git -C <worker> merge --ff-only

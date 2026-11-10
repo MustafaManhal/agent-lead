@@ -22,5 +22,9 @@
     "port": 9333,
     "browser": null
   },
-  "locks": "/tmp"
+  "locks": "/tmp",
+  "map": ".agent-lead/repo-map.md",
+  "maxWorkers": 3,
+  "portBase": 4100,
+  "workerSetup": "npm install"
 }

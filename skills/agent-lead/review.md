@@ -3,7 +3,12 @@
 Never take a report on trust: workers report work they did not do, skip the hard check, or guess where they should
 have looked. Review in this order, and keep it cheap (short outputs, the parts of files you need).
 
-## 0. Pick the depth
+## 0. Run the mechanical checks, then pick the depth
+
+`node <skill>/tools/verify.mjs <brief>` in the worker's checkout, before you read anything. It checks the report's
+sections, the brief's `## Files` scope, dependencies, the plan, `.agent-lead/`, `.env` files, secrets in the added
+lines, approved tests, and runs the checks. Any FAIL goes straight into a review round; do not spend a read on a
+diff that fails it. Its WARN lines (raw HTML, eval, SQL or shell built from strings) name what to read in section 4.
 
 - `{easy}` items (copy, config, one file, no data or auth): sections 1 to 3, read the whole diff, and section 5
   only when the change is visible in the UI. Skip the rest.
@@ -43,6 +48,8 @@ code, concurrency. Look for:
 - Guessed external formats or APIs where the brief asked for a real sample.
 - UI that only works in the test scene, hard-coded sizes or colors where the project has tokens.
 - Errors swallowed silently, missing empty and error states.
+- Security the brief did not have to ask for: user input validated on the server, queries parameterized, output
+  escaped, auth and ownership checked on every new endpoint, no secrets in code or logs.
 
 ## 5. See it working
 

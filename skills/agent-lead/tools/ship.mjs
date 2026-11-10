@@ -7,8 +7,9 @@
 // Co-author trailers: every --coauthor, then $AGENT_LEAD_COAUTHOR (lines), then $AGENT_LEAD_ATTRIBUTION (the lead's
 // own attribution line, for example "Co-Authored-By: Claude <noreply@anthropic.com>").
 // Stages config.commitPaths (default: everything). Run it in the checkout that holds the work.
+import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { config, git, options, run, toolsDir } from './lib.mjs'
+import { abs, config, git, options, run, toolsDir } from './lib.mjs'
 
 const args = process.argv.slice(2)
 const o = options(args)
@@ -41,9 +42,13 @@ if (!noPlan) {
 }
 
 // The checklist page is a build output: it is committed only when the project already tracks it.
-const pageTracked = git('ls-files', '--error-unmatch', config.page.out).status === 0
+const generated = [config.page.out, '.agent-lead/handoff.md']
+const untracked = generated.filter((f) => git('ls-files', '--error-unmatch', f).status !== 0)
+// The repo map is committed with the code it describes: rebuild it when the project has one.
+const mapFile = config.map ?? '.agent-lead/repo-map.md'
+if (existsSync(abs(mapFile))) process.stdout.write(run('node', [path.join(toolsDir, 'map.mjs')]).out)
 git('add', '-A', '--', ...config.commitPaths)
-if (!pageTracked) git('reset', '-q', '--', config.page.out)
+for (const f of untracked) git('reset', '-q', '--', f)
 // Staging everything is convenient and risky: never commit secret files, and show what goes in.
 const staged = git('diff', '--cached', '--name-only').out.trim().split('\n').filter(Boolean)
 const secrets = staged.filter((f) => /(^|\/)\.env(\.|$)/.test(f) && !/\.(example|sample|template)$/.test(f))
@@ -65,4 +70,5 @@ if (commit.status !== 0) {
   process.exit(1)
 }
 console.log(git('log', '--oneline', '-1').out.trim())
+if (existsSync(abs('.agent-lead'))) process.stdout.write(run('node', [path.join(toolsDir, 'handoff.mjs')]).out)
 if (!noPlan) console.log('Republish the checklist page (checklist-page.md) and tell the user what changed.')

@@ -5,6 +5,8 @@ Size: <easy | hard>. Model: <from LEAD.md section 1>.
 Read `<lead checkout>/.agent-lead/WORKER.md` first. <One or two lines: what already landed that this builds on,
 with commit hashes and file names. Which files the lead owns right now, if any.>
 
+Find files through `.agent-lead/repo-map.md` before searching. Your dev server port is `$AGENT_LEAD_PORT` when set.
+
 ## Goal
 <The user-visible result in two or three sentences. Why it matters (the FRs).>
 
@@ -16,11 +18,17 @@ with commit hashes and file names. Which files the lead owns right now, if any.>
 1. <Concrete change, with file paths, names, data shapes, tokens, states.>
 2. <…>
 
+## Files
+<What you may create or change, as backticked paths: `src/settings/` (a folder), `src/theme.ts`, `tests/*`. Nothing
+else. Test files are always allowed.>
+
 ## Check it yourself
 - <The scene to set up and the steps to take with real input; the screenshots to take (names).>
 - <The edge cases: empty, error, long text, offline, phone width, dark.>
 
 ## Tests
+<Tests-first items: this brief is only this section. Write failing tests from the spec, no product code, report,
+stop. The build comes as a review round after the lead approves the tests; you may not change them then.>
 - <What the tests must cover, including a negative case.>
 
 ## Done when

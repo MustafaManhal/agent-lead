@@ -210,6 +210,19 @@ Handoff mode needs no setup.
 The app scanner (`scan.mjs`: crawls an existing app into screens, controls, styles and tokens an agent can read)
 lives in its own repo: [scan-tool](https://github.com/MustafaManhal/scan-tool). Clone it next to this plugin when a project matches an existing app.
 
+## What keeps it cheap and fast
+
+| | What happens |
+| --- | --- |
+| Auto-retry | After a Pane run, failing checks go back to the same worker session, up to two times, before the lead reads anything. |
+| `verify` | A script, not a model, checks the report, the brief's file scope, dependencies, secrets and the checks. The lead reads a diff only after it passes. |
+| Repo map | `.agent-lead/repo-map.md`: every source file with its exports, so agents open the right file first. |
+| Tests first | For `{hard}` items the worker writes failing tests, the lead approves them, and the build round may not change them. |
+| Parallel workers | `worker.mjs add <name>`: a worktree, branch, port and log per worker, in any tool (Pane or Handoff). |
+| Issue intake | `intake.mjs` turns open GitHub issues into plan items. |
+| Handoff file | After every ship a script writes `.agent-lead/handoff.md`; a new session starts from it. |
+| Security rules | Always-on rules in `WORKER.md`, and a secret scan in `verify`. |
+
 ## Full and Light tracks
 
 - **Full**: the six docs, for a new product or anything with accounts, payments or stored user data.

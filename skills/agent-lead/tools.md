@@ -16,7 +16,8 @@ Write the full path into the project's LEAD.md and briefs (section 4, Commands),
 2. Otherwise copy `tools/config.example.json` to `.agent-lead/config.json` and keep only the keys that differ from
    the defaults: `plan`, `checks` (each `{ "name", "run" }`), `page` (checklist page title, lede, `sections`),
    `commitPaths`, `progressLog`, `notes` and `sources` (folders `next.mjs` searches), `devUrl`, `reference` (the
-   product being matched), `locks`. Commit it: it is project knowledge, not a secret.
+   product being matched), `locks`, `map`, `maxWorkers`, `portBase`, `workerSetup` (run in each new worker
+   checkout, for example `pnpm install`). Commit it: it is project knowledge, not a secret.
 3. Put the commands in LEAD.md section 4.
 
 ## The item loop
@@ -28,6 +29,11 @@ Write the full path into the project's LEAD.md and briefs (section 4, Commands),
 | `done.mjs "<item text>" [--status x\|~] [--note …] [--log …]` | Marks an item or part in the plan, adds a note line, logs it, rebuilds the checklist page. Refuses when the text matches more than one item (give more of it, or `--first`). |
 | `ship.mjs "<item text>" "<subject>" [--coauthor "Name <email>"]` | Checks, marks the plan, rebuilds the page and commits in one step; stops if a check fails or a `.env` file would be committed; prints the staged files. Trailers also come from `$AGENT_LEAD_COAUTHOR` and the lead's `$AGENT_LEAD_ATTRIBUTION`. `--no-plan "<subject>"` commits without a plan change. |
 | `land.mjs <branch> [--abort]` | Merges the worker's branch into the lead branch; runs the checks on a clean merge, or prints every conflict compactly (file, line, ours, theirs) for one-pass resolution. |
+| `verify.mjs <brief> [--tests-only]` | The mechanical review, no model: report sections, the brief's `## Files` scope, dependencies, plan, `.agent-lead/`, `.env`, secrets in added lines, approved tests, the checks. PASS/FAIL lines, exit 1 on any FAIL. `--tests-only` is the tests-first round: only test files may change, and their hashes are recorded. |
+| `map.mjs` | Writes `.agent-lead/repo-map.md`: commands, layout, every source file with its line count and exports. `ship` rebuilds it. |
+| `handoff.mjs` | Writes `.agent-lead/handoff.md`: last commits, next item, last status lines, newest briefs, workers. `ship` writes it after each commit. |
+| `intake.mjs [--label l] [--to heading] [--dry]` | Appends open GitHub issues (through `gh`, read only) to the plan as items with `#number` and a size tag; skips issues already there. |
+| `worker.mjs add\|list\|remove <name>` | Parallel workers in any tool: a worktree, branch, port and run log per worker; `list` shows uncommitted files and run state (running, stale, done). `maxWorkers` (3), `portBase` (4100) and `workerSetup` in the config. |
 | `../plan-page.mjs` | Builds the checklist page (`checklist-page.md`); `done` and `ship` call it for you. |
 
 ## Reading and editing code cheaply

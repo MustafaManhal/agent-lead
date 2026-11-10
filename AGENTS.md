@@ -21,7 +21,7 @@ settings. The hook passes `--skills` to install the short aliases too. `agent-vi
 the installed viewer); Node.js 22.18+ can execute its erasable TypeScript. The Claude parser and UI stay shared.
 Codex uses a terminal viewer in place of a custom side pane and a separate log under its runtime directory.
 
-Validate changes with `node --test tests/codex.test.mjs tests/loop.test.mjs`
+Validate changes with `node --test tests/codex.test.mjs tests/loop.test.mjs tests/tools.test.mjs`
 and `claude plugin validate .`. For browser changes, also run
 `AGENT_LEAD_PLAYWRIGHT_ROOT=<project-with-playwright> node --test tests/browser-background.test.mjs tests/browser-pipe.test.mjs`. `tests/codex.test.mjs` uses temporary runtime/skill directories and fake workers;
 it never starts a paid agent or changes the user's config. Test plugin discovery with `codex plugin list --available --json`.
@@ -38,7 +38,7 @@ The app scanner that used to be `tools/scan.mjs` is now a separate repo: https:/
 | Command `/lead` | `skills/agent-lead/lead-command.md`, installed to `~/.claude/commands/lead.md` by `install-lead.sh` (plugin commands always show as `/agent-lead:…`; a user command is plain `/lead`) | The only user command. Asks the workflow (Handoff or Pane) on first setup or on a switch, then reads `.agent-lead/LEAD.md` or runs the project setup. |
 | Skill `agent-lead` (`user-invocable: false`, so only `/lead` shows in the menu) | `skills/agent-lead/SKILL.md` + `project-setup.md`, `foundation.md`, `research.md`, `playwright.md`, `review.md`, `workflows/`, `clis.md` | The procedure: setup, the six docs, the item loop, review, shipping, both workflows. |
 | Templates | `skills/agent-lead/templates/` | The six docs (`docs/`), `LEAD.md`, `WORKER.md`, `brief.md`, `review-round.md`, `status.md`, `decisions.md`, `AGENTS.md` pointer section, `allow-lists.md`. |
-| Tools | `skills/agent-lead/tools/` + `tools.md` | Project-independent commands for the loop (`next`, `check`, `done`, `ship`, `land`), code reading (`outline`, `show`, `rep`, `snippet`), the app and the reference product (`play`, `observe`, `audit-ui`, `measure.js`, `macos/*.swift`), research (`research.py`, `ask`) and `lock`. Shared code in `tools/lib.mjs`: project root, `.agent-lead/config.json` with detection, loading Playwright from the project. |
+| Tools | `skills/agent-lead/tools/` + `tools.md` | Project-independent commands for the loop (`next`, `check`, `done`, `ship`, `land`), code reading (`outline`, `show`, `rep`, `snippet`), the app and the reference product (`play`, `observe`, `audit-ui`, `measure.js`, `macos/*.swift`), research (`research.py`, `ask`), `lock`, and the 0.14 set: `verify` (mechanical review), `map` (repo map), `worker` (parallel workers: worktree, port and log each), `intake` (GitHub issues into the plan), `handoff` (generated session state). Shared code in `tools/lib.mjs`: project root, `.agent-lead/config.json` with detection, loading Playwright from the project. |
 | Checklist page | `skills/agent-lead/plan-page.mjs` + `checklist-page.md` | The plan as one HTML page (progress, next item, folding milestone cards). Asked once per project, published with the Artifact tool to one stable link (or kept local), rebuilt after every checklist change. |
 | Launcher | `skills/agent-lead/agent-run`, installed to `~/.claude/agent-runs/agent-run` | For the known CLIs: builds the headless command with its stream flag, puts `worker-rules.md` in front of the brief, applies per-run limits, calls the wrapper, prints `SESSION <cli> <id>`. |
 | Run wrapper | `skills/agent-lead/run-agent.sh`, installed to `~/.claude/agent-runs/run-agent.sh` | Runs any CLI, frames its output with start/end lines, writes the live log. |
@@ -62,7 +62,7 @@ lead writes brief.md
 lead reviews the worktree diff ──> fixes: agent-run <cli> fixes.md --cd <worktree> --resume <id> ──> lead commits, merges, removes the worktree
 ```
 
-The log is overwritten by each run, so the pane shows one run at a time. `AGENT_LEAD_LOG` changes the path (the pane only reads the default path and the old `~/.claude/agy-runs/live.ndjson`). `AGENT_LEAD_TAIL` changes how many lines the wrapper prints back.
+After a clean exit `agent-run` runs `check.mjs` and, when it fails, resumes the same session with the failing lines (up to `AGENT_LEAD_RETRIES`, default 2). A named worker (`--name`, or a worktree registered with `worker.mjs`) logs to `runs/<name>.log` beside `live.log` and gets `AGENT_LEAD_PORT`; the pane follows the newest log, or the one `/agent <name>` pins. Each log is overwritten by its worker's next run. `AGENT_LEAD_LOG` changes the path (the pane only reads the default path and the old `~/.claude/agy-runs/live.ndjson`). `AGENT_LEAD_TAIL` changes how many lines the wrapper prints back.
 
 ## Event formats the pane reads (`hooks/parse.ts`)
 

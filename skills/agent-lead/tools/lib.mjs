@@ -95,6 +95,10 @@ export const config = {
   devUrl: raw.devUrl ?? null,
   reference: raw.reference ?? null,
   locks: raw.locks ?? '/tmp',
+  map: raw.map ?? null,
+  maxWorkers: raw.maxWorkers ?? null,
+  portBase: raw.portBase ?? null,
+  workerSetup: raw.workerSetup ?? null,
 }
 
 export const abs = (p) => (path.isAbsolute(p) ? p : path.join(root, p))
