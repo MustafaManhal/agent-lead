@@ -32,8 +32,8 @@ In any project, run:
 ```
 
 or `/lead build the settings screen` (words after `/lead` are your goal for the session). `/lead` is the only
-command. Every time you run it, it first asks which workflow style you want: Handoff or Pane (your current one is
-listed first). The first time, the lead then:
+command. The first time in a project it asks which workflow style you want: Handoff or Pane (say "switch to pane" later to
+change it). The first time, the lead then:
 
 1. Looks around the project (git, stack, commands, existing docs and checklists).
 2. Asks you a few questions at once: the worker, what to do about missing docs, where the worker works.
@@ -44,7 +44,7 @@ listed first). The first time, the lead then:
 5. Starts milestone M0 (the foundation: tooling, design tokens, checks, a screenshot helper), then works the plan
    item by item.
 
-Every later session: run `/lead` again. Pick the workflow (keep the current one or switch); the lead reads
+Every later session: run `/lead` again; the lead reads
 `LEAD.md` and continues where the last one stopped.
 
 ## The loop for each item
@@ -204,6 +204,19 @@ Install and sign in to the worker CLI(s) you want to use. The plugin's first-run
 run it by hand: `bash ~/.claude/plugins/marketplaces/agent-lead/skills/agent-lead/setup.sh`, then restart.
 
 Handoff mode needs no setup.
+
+## Full and Light tracks
+
+- **Full**: the six docs, for a new product or anything with accounts, payments or stored user data.
+- **Light**: one plan file (`.agent-lead/plan.md`) for a feature, a bug batch or a prototype of up to about 15 items.
+
+Every plan item ends with `{easy}` or `{hard}`. The tag picks the worker model and how deep the review goes.
+
+## When the worker runs out
+
+LEAD.md holds a **worker chain** (main worker, backup, last resort). When a worker stops on quota or crashes, the
+lead runs the same brief with the next one and tells you in one line; it asks only when the chain is used up.
+Pane runs print `USAGE <cli> <model> tokens=… seconds=…`, and each landed item's cost goes into `status.md`.
 
 ## Good to know
 

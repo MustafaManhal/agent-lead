@@ -45,13 +45,14 @@ The adapter supplies the Codex paths, setup and UI equivalents for the shared wo
   page link. If LEAD.md has no "Checklist page" row yet, ask the user about the page once (`checklist-page.md`).
 - **It does not exist**: follow `project-setup.md`. It asks the user which workflow (Pane or Handoff) and which
   worker, wires up `.agent-lead/`, and sends you to `foundation.md` when the project has no product docs yet.
-- **Every project ends up with the six docs** (PRD, TRD, UI/UX design, app flow, backend schema, implementation plan).
-  The implementation plan is the checklist. Do not start feature work on a project without them; for an existing
-  project, write them from the code and the user's answers (`foundation.md`), then continue.
+- **Two tracks.** *Full*: the six docs (PRD, TRD, UI/UX design, app flow, backend schema, implementation plan); the
+  implementation plan is the checklist. Use it for a new product or anything with accounts, payments or stored user
+  data. *Light*: one plan file (`templates/plan-light.md` as `.agent-lead/plan.md`) for a feature, a bug batch or a
+  prototype of up to about 15 items. `project-setup.md` picks the track with the user and LEAD.md records it. Do not
+  start feature work without the track's plan; move a Light project to Full when it outgrows the limits.
 - `/lead` (Claude Code or the desktop skill menu) or `$lead` (Codex CLI/IDE) starts the workflow.
-  It always asks the user first which workflow to use this session (Handoff or Pane,
-  the current one first). A choice that differs from LEAD.md switches the project's workflow; record the change in
-  LEAD.md. Any words after `/lead` are the user's goal for this session.
+  It asks which workflow to use (Handoff or Pane) only when the project has no LEAD.md yet, or when the user's
+  words ask to switch. Otherwise it uses LEAD.md's workflow and says so in one line. Record a switch in LEAD.md. Any words after `/lead` are the user's goal for this session.
 
 ## 2. The loop for one item (both workflows)
 
@@ -61,11 +62,14 @@ The adapter supplies the Codex paths, setup and UI equivalents for the shared wo
    same process in the next phase. A task is complete when its code, tests, checks and report are done and reviewed,
    not when it is "mostly there". If a task can only be closed by something the lead cannot do (a check on another
    OS, an owner account), mark it partial with the open check named in its note, tell the user exactly what to do,
-   and say that it is the only thing left in that task. New findings become new checklist items, not code. Split a
+   and say that it is the only thing left in that task. New findings become new checklist items, not code. Every item carries a size tag at its end: `{easy}` (copy,
+   config, one file, no data or auth) or `{hard}`; the tag picks the worker model (LEAD.md section 1) and the review
+   depth (`review.md`). Split a
    big item into parts a, b, c in the checklist first (one commit per part) and show the user the split.
 2. **Prepare just enough** to write a precise brief: the relevant files (declarations and the parts you need, not
    whole large files), the project docs it touches, and any reference the work must match (a design, an API, a spec,
-   another product's behaviour). Leave the full investigation to the worker.
+   another product's behaviour). Leave the full investigation to the worker. Hand long pages or files
+   you only need a few facts from to the cheaper model (`tools/ask.mjs`) instead of reading them yourself.
 3. **Write the brief** from `templates/brief.md` into `.agent-lead/briefs/<NN>-<item>.md`. It must stand on its own:
    the worker has not seen this conversation. Point it at the docs sections it implements (FR numbers, screens,
    flows, tables), the research to do first, the in-app check, and the report path.
@@ -91,10 +95,13 @@ round. Say so in the checklist note and to the user.
 4. Merge the worker's branch into the lead branch. Resolve conflicts, run the checks again, commit the merge.
 5. Bring the worker's checkout up to date (`git -C <worker> merge --ff-only <lead branch>`), only when it has no
    uncommitted work.
-6. Add one line to `.agent-lead/status.md` (date, what landed with its hash, what is next, any blocker) and update
-   LEAD.md's "Current state". Commit them.
-7. Rebuild the checklist page and republish it to the same URL (`checklist-page.md`), unless the user declined it.
-   Do this after every checklist change, not only after a ship: splits, new items and reorders too.
+6. Add one line to `.agent-lead/status.md`: date, what landed with its hash, the cost (worker and model, review
+   rounds, worker tokens and seconds from the `USAGE` line `agent-run` prints or the pane; in Handoff what the user
+   reports, else "n/a"), what is next, any blocker. Update LEAD.md's "Current state". Commit them. When one item
+   needs three rounds or more, say so to the user: the brief or the model was wrong for it.
+7. Republish the checklist page to the same URL once per ship (`checklist-page.md`), unless the user declined it or
+   it is a local file. `done` and `ship` rebuild the local file after every change; splits, new items and reorders
+   go out with the next ship, not as a publish of their own.
 8. Tell the user what landed, which checklist items changed, the new totals, the next item and the checklist page
    link. In Handoff mode, end with the next prompt in its own code block.
 
@@ -140,10 +147,13 @@ the lead checkout while the worker works:
 
 A quota limit, a crash or a refused command can end a run. Look at the worker's checkout first:
 
-- **Nothing changed**: ask the user, recommended first: switch the worker's model or CLI; wait for the quota; or let
-  you build this one item yourself.
-- **Partial work, no report**: have the next worker continue from the diff ("read the brief and the current diff,
+- **Nothing changed**: move to the next entry of the worker chain in LEAD.md section 1 and run the same brief
+  again, without asking. Tell the user in one line which worker took over and why. Ask the user only when the
+  chain is used up (options, recommended first: wait for the quota; another model or CLI; you build this one item).
+- **Partial work, no report**: have the next worker in the chain continue from the diff ("read the brief and the current diff,
   finish the task, write the report").
+- Note every switch in status.md (who stopped, who continued). Go back to the first worker of the chain at the
+  next item, or when its quota is back.
 - Never mark an item done that has no report and no review.
 
 ## 8. Rules that hold everywhere

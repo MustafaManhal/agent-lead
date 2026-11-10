@@ -10,5 +10,5 @@ this skill is the goal; `$ARGUMENTS` in the shared procedure means that message,
 Load [agent-lead](../agent-lead/SKILL.md) and read [the Codex adapter](../agent-lead/workflows/codex.md)
 when running in Codex. Resolve references from those files' own directories.
 
-The workflow question comes first on every invocation, including when resuming. Use the question tool available
-in this session, or plain chat if none is available. Wait for the user's choice before starting the workflow.
+Ask the workflow question only when the project has no `.agent-lead/LEAD.md` or the user asks to switch; otherwise
+use the recorded workflow. Use the question tool available in this session, or plain chat if none is available.

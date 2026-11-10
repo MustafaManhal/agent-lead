@@ -25,8 +25,8 @@ Write the full path into the project's LEAD.md and briefs (section 4, Commands),
 | --- | --- |
 | `next.mjs [--all]` | The first item not done, in plan order, its first open part, and the notes and source files that mention its key words, ranked. Run it before writing a brief. |
 | `check.mjs [--only a,b]` | Runs the project's checks and prints `OK types · lint · tests 412 passed`, or the first errors of each failing check. The worker runs it before reporting; the lead before every commit. |
-| `done.mjs "<item text>" [--status x\|~] [--note …] [--log …]` | Marks an item or part in the plan, adds a note line, logs it, rebuilds the checklist page. |
-| `ship.mjs "<item text>" "<subject>" [--coauthor "Name <email>"]` | Checks, marks the plan, rebuilds the page and commits in one step; stops if a check fails. Trailers also come from `$AGENT_LEAD_COAUTHOR` and the lead's `$AGENT_LEAD_ATTRIBUTION`. `--no-plan "<subject>"` commits without a plan change. |
+| `done.mjs "<item text>" [--status x\|~] [--note …] [--log …]` | Marks an item or part in the plan, adds a note line, logs it, rebuilds the checklist page. Refuses when the text matches more than one item (give more of it, or `--first`). |
+| `ship.mjs "<item text>" "<subject>" [--coauthor "Name <email>"]` | Checks, marks the plan, rebuilds the page and commits in one step; stops if a check fails or a `.env` file would be committed; prints the staged files. Trailers also come from `$AGENT_LEAD_COAUTHOR` and the lead's `$AGENT_LEAD_ATTRIBUTION`. `--no-plan "<subject>"` commits without a plan change. |
 | `land.mjs <branch> [--abort]` | Merges the worker's branch into the lead branch; runs the checks on a clean merge, or prints every conflict compactly (file, line, ours, theirs) for one-pass resolution. |
 | `../plan-page.mjs` | Builds the checklist page (`checklist-page.md`); `done` and `ship` call it for you. |
 

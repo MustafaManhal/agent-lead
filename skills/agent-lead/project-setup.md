@@ -28,7 +28,7 @@ Run these yourself; do not ask the user what you can find out.
 
 ## 2. Ask the user (one AskUserQuestion with up to four questions; plain chat when the tool is missing)
 
-Skip any question the project already answers. `/lead` asks the workflow before anything else, so skip question 1
+Skip any question the project already answers. `/lead` asks the workflow first on a new project, so skip question 1
 when it ran; ask it only when the skill was started without `/lead`.
 
 1. **Workflow** — options:
@@ -37,7 +37,8 @@ when it ran; ask it only when the skill was started without `/lead`.
      or uses a tool `agent-run` does not launch.
    - "Pane (I launch the worker, you watch /agent)" — you start the worker CLI headless with `agent-run`; the
      `/agent` pane shows every step live. The plugin set it up on install (`workflows/pane.md` if it is missing).
-2. **Worker** — which agent and, if they care, which model. Pane needs a CLI `agent-run` knows (`clis.md`) or any CLI
+2. **Worker** — which agent and, if they care, which model; and a backup worker (another CLI, or a cheaper model
+   of the same one) for when the first runs out of quota. Together they are the worker chain in LEAD.md. Pane needs a CLI `agent-run` knows (`clis.md`) or any CLI
    through `run-agent.sh`. Handoff works with anything.
 3. **Docs and checklist** — "Found <files>: build the missing docs from them" (recommended when some exist) / "New
    project: start the foundation (questions, research, the six docs)" / "Use GitHub issues as the checklist and write
@@ -48,11 +49,18 @@ when it ran; ask it only when the skill was started without `/lead`.
    checklist page" (`checklist-page.md` section 1). With four questions above, ask this one in a second
    AskUserQuestion right after.
 
-## 3. The six docs and the checklist
+## 3. The track, the docs and the checklist
+
+- **Pick the track first** and record it in LEAD.md. *Light* when the work is a feature, a bug batch or a prototype
+  of up to about 15 items and touches no accounts, payments or stored user data, or when the user asks for quick:
+  write `.agent-lead/plan.md` from `templates/plan-light.md` (goal, constraints, checklist, done-when) from a few
+  questions, skip the six docs and the foundation research, and keep the checklist page local unless the user wants
+  the link. *Full* for everything else: the rest of this section. Move Light to Full when the plan passes about 15
+  items or data, auth or payments appear.
 
 - **None or some missing**: follow `foundation.md` now. For an existing codebase, write the docs from what the code
   does plus the user's answers, mark what is already built as `[x]` in the implementation plan, and put the remaining
-  work after it. Never skip this to "save time": briefs, reviews and the checklist all point into these docs.
+  work after it. On the Full track never skip this to "save time": briefs, reviews and the checklist all point into these docs.
 - **An existing checklist in another file**: keep it if the user prefers it, and record its path in LEAD.md as "the
   checklist"; the implementation plan then links to it instead of copying it. Learn its markers (`[x]` done, `[~]`
   partial, `[ ]` open is the convention; adopt the file's own if it differs) and its order.

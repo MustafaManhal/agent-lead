@@ -1,5 +1,7 @@
 # Task <NN>: <item name> (<milestone>, <FR-xx, …>)
 
+Size: <easy | hard>. Model: <from LEAD.md section 1>.
+
 Read `<lead checkout>/.agent-lead/WORKER.md` first. <One or two lines: what already landed that this builds on,
 with commit hashes and file names. Which files the lead owns right now, if any.>
 

@@ -12,6 +12,8 @@ brief asks, completely, and nothing outside it.
 4. Write tests for the new logic, including a case that must not match or must fail.
 5. Check it in the running app with real input (`node <skill>/tools/play.mjs --url <dev url> …`): phone and desktop width, light
    and dark when the project has both, keyboard, empty and error states. Save screenshots and list their paths.
+   Headless (Pane) runs can only do this when the brief says the command is allowed for the run; otherwise write
+   "not checked in the app" under Left, and the lead does it.
 6. Fix what you find. Run `node <skill>/tools/check.mjs` until it prints OK.
 
 Tools you may use (`<skill>/tools.md`): `next`, `check`, `outline`, `show`, `rep`, `snippet`, `play`, `observe`,

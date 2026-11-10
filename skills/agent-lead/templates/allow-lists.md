@@ -3,6 +3,9 @@
 You normally need none of this: the plugin's first-run setup (`setup.sh`) and `agent-run` (per run) set it up for agy, Claude Code, Codex, Gemini CLI, Qwen Code, OpenCode and Cursor Agent. Use this page to run a CLI by hand, to widen the list, or for a CLI `agent-run` does not know.
 
 A headless worker cannot ask for permission, so it needs an allow list. Start from the safe set below (reading, looking around, git read-only, tests, lint, typecheck, build) and keep destructive or outward commands off it: `rm`, `mv`, `chmod`, `sudo`, `git commit`/`push`/`merge`/`checkout`, `npm install`, `npx <pkg>`, `curl`, `wget`, plain `node <file>`. Only the user edits these files.
+`agent-run` adds two things per run on its own: the project's package manager scripts (pnpm, yarn or bun, from the
+lockfile) and the read-only tools `node <tools>/check.mjs`, `next.mjs`, `outline.mjs`, `show.mjs`. For agy and
+Cursor, whose lists live in a file, add those lines by hand when the project needs them.
 
 The safe set: `ls`, `pwd`, `cat`, `head`, `tail`, `wc`, `find`, `grep`, `rg`, `tree`, `diff`, `file`, `git status`, `git diff`, `git log`, `git show`, `git branch`, `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`.
 

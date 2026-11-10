@@ -3,6 +3,13 @@
 Never take a report on trust: workers report work they did not do, skip the hard check, or guess where they should
 have looked. Review in this order, and keep it cheap (short outputs, the parts of files you need).
 
+## 0. Pick the depth
+
+- `{easy}` items (copy, config, one file, no data or auth): sections 1 to 3, read the whole diff, and section 5
+  only when the change is visible in the UI. Skip the rest.
+- `{hard}` items, anything touching data, auth, payments or migrations, and any item whose report looks thin: every
+  section.
+
 ## 1. The report against the brief
 
 - Every numbered point of the brief has an answer: done, or "not done" with a reason.

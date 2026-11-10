@@ -19,6 +19,10 @@ command -v node >/dev/null || { echo "setup: Node.js is needed to edit the JSON 
 mkdir -p "$dest"
 cp "$here/agent-run" "$here/run-agent.sh" "$here/worker-rules.md" "$dest/"
 chmod +x "$dest/agent-run" "$dest/run-agent.sh"
+# The run viewer and its parser (agent-run reads tokens and time from them) and where the tools live.
+cp "$here/agent-view.mjs" "$dest/"
+[ -f "$here/../../hooks/parse.ts" ] && cp "$here/../../hooks/parse.ts" "$dest/"
+echo "$here/tools" > "$dest/tools-path"
 echo "✔ installed agent-run, run-agent.sh and worker-rules.md in $dest"
 bash "$here/install-lead.sh"
 

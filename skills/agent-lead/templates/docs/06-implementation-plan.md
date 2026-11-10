@@ -7,6 +7,8 @@
 - The lead keeps this file current; the worker never edits it.
 - Every item cites the requirements it delivers (FR-xx, NFR-xx) and ends with the project's `check` passing.
 - New findings become new items here, not code.
+- Every item ends with a size tag: `{easy}` (copy, config, one file, no data or auth) or `{hard}`. It picks the
+  worker model and the review depth.
 
 ## 2. Repository layout
 <The folders from the TRD and what goes where.>
@@ -21,7 +23,7 @@
 - [ ] Dev tools: seed data, `tools/shot.mjs`, fixtures folder; agent pointers (AGENTS.md, CLAUDE.md).
 
 ### M1. <Name> (FR-01, FR-02, …)
-- [ ] <Item: the user-visible result, the FRs, how it is checked.>
+- [ ] <Item: the user-visible result, the FRs, how it is checked.> `{hard}`
   **In order:** [ ] a. <part> [ ] b. <part>
 
 ### M2. <Name> (FR-…)

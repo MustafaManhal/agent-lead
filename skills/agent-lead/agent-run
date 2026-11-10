@@ -7,7 +7,8 @@
 # The built-in worker rules are put in front of the brief, and each CLI gets per-run safety
 # flags (an allow list or a sandbox), so no project or worker config file has to be edited.
 # Prints the last lines of the run and a final "SESSION <cli> <id>" line for follow-ups
-# (pass that id back with --resume). Exits with the worker's exit code.
+# (pass that id back with --resume), then "USAGE <cli> <model> tokens=N seconds=N denied=N" (also appended to
+# usage.log beside this script). Exits with the worker's exit code.
 set -uo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -41,6 +42,18 @@ fi
 
 # The safe command set (extend with AGENT_LEAD_ALLOW="cmd one,cmd two").
 safe=(ls pwd cat head tail wc find grep rg tree diff file "git status" "git diff" "git log" "git show" "git branch" "npm test" "npm run lint" "npm run typecheck" "npm run build")
+# The project's own package manager (the lockfile decides), so its checks are not refused.
+pm=""
+if [ -f pnpm-lock.yaml ]; then pm="pnpm"; elif [ -f yarn.lock ]; then pm="yarn"; elif [ -f bun.lock ] || [ -f bun.lockb ]; then pm="bun"; fi
+if [ -n "$pm" ]; then
+  for s in test lint typecheck build; do safe+=("$pm $s" "$pm run $s"); done
+fi
+# The read-only agent-lead tools WORKER.md tells the worker to use (setup records where they live).
+tools="${AGENT_LEAD_TOOLS:-}"
+if [ -z "$tools" ] && [ -f "$here/tools-path" ]; then tools="$(cat "$here/tools-path")"; fi
+if [ -n "$tools" ] && [ -d "$tools" ]; then
+  for t in check next outline show; do safe+=("node $tools/$t.mjs"); done
+fi
 if [ -n "${AGENT_LEAD_ALLOW:-}" ]; then IFS=',' read -r -a extra <<< "$AGENT_LEAD_ALLOW"; safe+=("${extra[@]}"); fi
 
 cmd=()
@@ -112,4 +125,12 @@ code=$?
 log="${AGENT_LEAD_LOG:-$HOME/.claude/agent-runs/live.log}"
 session="$(grep -o -E '"(conversation_id|session_id|thread_id|sessionID)":"[^"]+"' "$log" | head -1 | sed -E 's/.*:"([^"]+)"/\1/')"
 echo "SESSION $cli ${session:-unknown}"
+# Cost of the run, for the status log: printed here and kept in usage.log beside the launcher.
+if [ -f "$here/agent-view.mjs" ] && command -v node >/dev/null; then
+  usage="$(node "$here/agent-view.mjs" --json --log "$log" 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const v=JSON.parse(s);console.log(`tokens=${v.tokens||0} seconds=${v.seconds||0} denied=${v.denied||0}`)}catch{}})' 2>/dev/null || true)"
+  if [ -n "$usage" ]; then
+    echo "USAGE $cli ${model:-default} $usage"
+    printf '%s\t%s\t%s\t%s\texit=%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M')" "$cli" "${model:-default}" "$usage" "$code" "$PWD" "$(basename "$brief")" >> "$here/usage.log" 2>/dev/null || true
+  fi
+fi
 exit "$code"

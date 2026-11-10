@@ -27,7 +27,7 @@ normal permission flow; do not run Claude's `setup.sh` from Codex.
 
 ## Choose the workflow
 
-Ask on every `/lead` or `$lead` invocation, putting the project's current mode first:
+Ask on the first `/lead` or `$lead` in a project, or when the user asks to switch (otherwise use LEAD.md's mode):
 
 - **Handoff**: the user launches the worker and pastes the brief prompt.
 - **Launched worker (Pane in the shared playbook)**: Codex runs `agent-run`; the user watches a terminal viewer.

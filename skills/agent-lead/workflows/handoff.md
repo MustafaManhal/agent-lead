@@ -46,7 +46,8 @@ session"). Use absolute paths: the worker's working folder differs from yours.
 
 ## When the user says the worker hit its limit
 
-Check the worker's checkout, then follow SKILL.md section 7. When switching models, give the same prompt again (or the
+Check the worker's checkout, then follow SKILL.md section 7: name the next worker of the chain in LEAD.md and give
+the prompt for it right away, without asking which one. Give the same prompt again (or the
 "continue" prompt for partial work) and note the model in the report's header and in status.md.
 
 ## What the worker can do in this mode

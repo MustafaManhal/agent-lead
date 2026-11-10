@@ -7,7 +7,7 @@ finished items inside open ones, fold away. Long item notes sit behind "Details"
 done work in any browser, and the page keeps which cards were open. It has light and dark themes and fits a phone.
 
 It is part of the workflow, not an extra: set it up on the first `/lead`, rebuild it every time the checklist
-changes, and give the user the link with every progress report.
+changes, republish it with every ship, and give the user the link with every progress report.
 
 ## 1. Ask once (project setup)
 
@@ -51,8 +51,8 @@ node <skill>/plan-page.mjs <plan.md> .agent-lead/checklist.html --title "<Projec
 - **First publish:** Artifact tool, `file_path` the built page, `icon: "checklist"`, a one-sentence `description`
   ("<Project>'s implementation checklist: progress, the next item, one card per milestone."). Put the returned URL
   in LEAD.md section 2 and tell the user it is private until they share it.
-- **After every checklist change** (an item or part ticked, a split into parts, a new item, a reorder): rebuild and
-  republish to the same URL, in the same turn as the commit that changed the plan. `ship` step 7 in SKILL.md.
+- **Rebuild** the local file after every checklist change (`done` and `ship` do it). **Republish** to the same URL
+  once per ship (step 7 in SKILL.md); splits, new items and reorders go out with the next ship.
 - **Another session or another device published in between** and the publish is refused: the page is generated, so
   read the live version once (Artifact `read`), check that the plan file is the newer source, and publish your
   rebuilt page again. Never hand-edit the published HTML; change the plan and rebuild.

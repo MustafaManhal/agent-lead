@@ -6,7 +6,10 @@ facts. Keep section 8 current.
 
 ## 1. Workflow
 - Lead host: <Claude Code | Codex | other>. Entry point: </lead | $lead | skill name>.
-- Mode: <Handoff | Pane>. Worker: <agent and model>. Changed on <date> because <reason>.
+- Mode: <Handoff | Pane>. Changed on <date> because <reason>. Track: <Full (six docs) | Light (.agent-lead/plan.md)>.
+- Worker chain (used in order when a worker stops on quota or crashes, without asking the user):
+  1. <agent and model> 2. <backup agent or model> 3. <ask the user | the lead builds that one item>.
+- Models by item size: `{easy}` → <cheaper model>; `{hard}` → <stronger model>.
 - The worker does about 95% of each item (build, tests, in-app check, research, report). The lead plans, writes
   briefs, reviews, commits, keeps the checklist and reports to the user.
 - Lead may fix small things in the worker's code: <no (default) | only one-line typos | yes>.

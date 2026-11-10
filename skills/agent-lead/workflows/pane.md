@@ -34,11 +34,16 @@ The worker CLI must be installed and signed in. If it is not, tell the user. Do 
   (see `clis.md`).
 - One command, no `cd` chain before it: your shell may return to the repo root between commands.
 - `agent-run` puts `worker-rules.md` in front of the brief, applies the per-run limits, records the run for the pane,
-  prints the run's last lines and `SESSION <cli> <id>`. Keep that id in the brief's report header and in status.md.
+  prints the run's last lines, `SESSION <cli> <id>` and `USAGE <cli> <model> tokens=… seconds=… denied=…`. Keep the
+  id in the brief's report header; put the usage in the status.md line (every run is also in
+  `~/.claude/agent-runs/usage.log`).
 - Extra commands for one run: `AGENT_LEAD_ALLOW="npm run e2e,make check" agent-run …`. Only commands the task needs;
   never `rm`, `git commit/push/merge/checkout`, package installs, `curl`, or "approve everything" switches.
 - The brief asks for the report file like in Handoff mode; headless workers write it with their file tools. If the
   run ends without it, the run's final reply is the report: save it to `<brief>.report.md` yourself.
+
+Pick `--model` from the item's size tag and LEAD.md section 1 (`{easy}` → the cheaper model). If the run stops on
+quota, run the same brief with the next worker of the chain (SKILL.md section 7).
 
 ## Review rounds
 
@@ -50,8 +55,10 @@ Send fixes to the same session so it keeps its context:
 
 ## What a headless worker cannot do
 
-It runs only allow-listed commands (`worker-rules.md`): no dev server, no browser, no screenshots, unless you widen
-the list for the run. So in Pane mode you do the in-app check yourself during review (screenshots, real input), or
+It runs only allow-listed commands (`worker-rules.md`): the safe set, the project's package manager scripts (test,
+lint, typecheck, build; pnpm, yarn and bun are detected from the lockfile) and the read-only tools `check.mjs`,
+`next.mjs`, `outline.mjs` and `show.mjs`. No dev server, no browser, no screenshots (`play.mjs`, `observe.mjs`,
+`audit-ui.mjs`), unless you widen the list for the run. So in Pane mode you do the in-app check yourself during review (screenshots, real input), or
 add the exact commands the task needs to `AGENT_LEAD_ALLOW`. Say in LEAD.md which of the two this project uses.
 
 ## Gotchas

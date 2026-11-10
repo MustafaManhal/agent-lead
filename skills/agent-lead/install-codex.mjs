@@ -62,6 +62,7 @@ try {
   ]) await put(join(dest, name), await readFile(join(here, source)), name.endsWith('.sh') || name === 'agent-run.core')
   const parser = await read(join(root, 'hooks/parse.ts')) || await readFile(join(here, 'parse.ts'))
   await put(join(dest, 'parse.ts'), parser)
+  await put(join(dest, 'tools-path'), Buffer.from(join(here, 'tools') + '\n'))
 
   // Keep the shared launcher's Claude default intact; this entry point selects the Codex log.
   for (const [name, target] of [['agent-run', 'agent-run.core'], ['run-agent.sh', 'run-agent.core.sh']]) {
