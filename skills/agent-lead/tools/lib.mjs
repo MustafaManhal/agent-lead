@@ -149,6 +149,10 @@ export function buildPage() {
   if (config.page.title) args.push('--title', config.page.title)
   if (config.page.lede) args.push('--lede', config.page.lede)
   if (config.page.sections) args.push('--sections', config.page.sections)
+  // The worker prompts shown at each task: rebuilt from the briefs every time the page is.
+  const prompts = abs('.agent-lead/prompts.json')
+  run('node', [path.join(toolsDir, 'prompts.mjs'), '--json', prompts])
+  if (existsSync(prompts)) args.push('--prompts', prompts)
   const r = run('node', args)
   try {
     return JSON.parse(r.stdout.trim().split('\n').pop())

@@ -24,6 +24,14 @@ URL, `local: .agent-lead/checklist.html`, or `declined <date>`). An existing pro
 gets the question once, at the start of the next session. A user who declined is not asked again unless they bring
 it up.
 
+## 1b. Prompts on the page
+
+With briefs in `.agent-lead/briefs/`, the page also shows the worker prompts (`tools/prompts.mjs`): a **Prompts**
+panel at the top with one card per worker (the prompt to paste now, the rest queued), and the same prompt inside
+each open task, each with a Copy button. A reported task shows "lead reviews" instead of a prompt; a review round
+replaces the prompt with the round's; a ticked task keeps only who did it. `done` and `ship` rebuild all of it.
+Prompts hold file paths (the home folder is written as `~`): fine on a private page, worth a look before sharing it.
+
 ## 2. Build
 
 ```bash

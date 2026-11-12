@@ -57,4 +57,4 @@ if (log && config.progressLog) {
   console.log(`${config.progressLog}: + ${log.slice(0, 120)}`)
 }
 const t = buildPage()
-if (t) console.log(`checklist page rebuilt: ${t.done} done · ${t.partial} in progress · ${t.todo} not started · next: ${t.next ?? 'none'}`)
+if (t) console.log(`checklist page rebuilt: ${t.done} done · ${t.partial} in progress · ${t.todo} not started · next: ${t.next ?? 'none'}${t.prompts ? ` · ${t.prompts} worker prompt(s) open` : ''}`)

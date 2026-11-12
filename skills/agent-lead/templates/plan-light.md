@@ -2,7 +2,8 @@
 
 <!-- The Light track: this one file replaces the six docs for small work (a feature, a bug batch, a prototype,
      up to about 15 items). Status markers: [ ] open, [~] partial (with a dated note), [x] done and verified.
-     Work in order. Each item is one worker run and one commit. End each item with its size tag. -->
+     Work in order. Each item is one worker run and one commit. End each item with its size tag. Every item gets
+     its brief in .agent-lead/briefs/ as soon as this plan is approved. -->
 
 ## Goal
 <What the user gets, in two or three sentences. Who it is for.>

@@ -24,11 +24,12 @@ Write the full path into the project's LEAD.md and briefs (section 4, Commands),
 
 | Tool | What it does |
 | --- | --- |
-| `next.mjs [--all]` | The first item not done, in plan order, its first open part, and the notes and source files that mention its key words, ranked. Run it before writing a brief. |
+| `next.mjs [--all]` | The first item not done, in plan order, its brief and the prompt to hand over, its first open part, and the notes and source files that mention its key words, ranked. Run it before writing a brief. |
 | `check.mjs [--only a,b]` | Runs the project's checks and prints `OK types · lint · tests 412 passed`, or the first errors of each failing check. The worker runs it before reporting; the lead before every commit. |
 | `done.mjs "<item text>" [--status x\|~] [--note …] [--log …]` | Marks an item or part in the plan, adds a note line, logs it, rebuilds the checklist page. Refuses when the text matches more than one item (give more of it, or `--first`). |
 | `ship.mjs "<item text>" "<subject>" [--coauthor "Name <email>"]` | Checks, marks the plan, rebuilds the page and commits in one step; stops if a check fails or a `.env` file would be committed; prints the staged files. Trailers also come from `$AGENT_LEAD_COAUTHOR` and the lead's `$AGENT_LEAD_ATTRIBUTION`. `--no-plan "<subject>"` commits without a plan change. |
 | `land.mjs <branch> [--abort]` | Merges the worker's branch into the lead branch; runs the checks on a clean merge, or prints every conflict compactly (file, line, ours, theirs) for one-pass resolution. |
+| `prompts.mjs [--all] [--worker w] [--missing]` | Every paste-ready worker prompt, built from the briefs (`Item:` and `Worker:` lines), grouped by worker with its state: ready, reported, review round, done. `--missing` lists open items without a brief and exits 1. The checklist page shows the same at each task; `done` and `ship` refresh it. |
 | `verify.mjs <brief> [--tests-only]` | The mechanical review, no model: report sections, the brief's `## Files` scope, dependencies, plan, `.agent-lead/`, `.env`, secrets in added lines, approved tests, the checks. PASS/FAIL lines, exit 1 on any FAIL. `--tests-only` is the tests-first round: only test files may change, and their hashes are recorded. |
 | `map.mjs` | Writes `.agent-lead/repo-map.md`: commands, layout, every source file with its line count and exports. `ship` rebuilds it. |
 | `handoff.mjs` | Writes `.agent-lead/handoff.md`: last commits, next item, last status lines, newest briefs, workers. `ship` writes it after each commit. |

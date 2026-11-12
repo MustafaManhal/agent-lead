@@ -21,6 +21,9 @@ Continue someone else's partial work:
 You are the worker. Read <lead checkout>/.agent-lead/WORKER.md and <brief>. Part of the task is already done in <worker checkout> (see git diff there). Finish the rest, then write <report> as WORKER.md says, then stop.
 ```
 
+`node <skill>/tools/prompts.mjs` prints these, filled in, for every brief, and the checklist page shows each one at
+its task with a Copy button, so the user can start the next task without waiting for you.
+
 Give each prompt alone in a code block, and say in one line which session it goes to ("paste this in the worker
 session"). Use absolute paths: the worker's working folder differs from yours.
 

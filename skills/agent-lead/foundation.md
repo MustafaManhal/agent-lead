@@ -87,6 +87,12 @@ Save to `research/<topic>.md` with a source list. Summarise each in five lines f
 5. Show the user a short summary of each document and the open questions. Get a yes, or changes, before building.
    Commit the documents ("docs: PRD, TRD, UI/UX, app flow, schema, implementation plan").
 
+## Phase 4b. Write every brief
+
+Right after the user approves the plan, write the brief for every item of every milestone (SKILL.md section 2b).
+The documents are fresh in your context now, which is the cheapest moment to do it; later sessions only refresh a
+line or two. `prompts.mjs --missing` must report none before M0 starts. Briefs are git-ignored, like before.
+
 ## Phase 5. Milestone M0: the foundation
 
 M0 makes the project easy to build right. It is the first item of the implementation plan and goes to the worker

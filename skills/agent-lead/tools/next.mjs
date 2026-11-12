@@ -4,7 +4,7 @@
 //   node <tools>/next.mjs [--all]          --all also lists every open item of that milestone
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
-import { abs, config, root } from './lib.mjs'
+import { abs, config, root, run, toolsDir } from './lib.mjs'
 
 if (!config.plan) {
   console.error('No plan file found. Set "plan" in .agent-lead/config.json.')
@@ -51,6 +51,16 @@ if (part) console.log(`\nFirst open part: [${part[1]}] ${part[2].trim()}`)
 const blocked = items.filter((o) => o.status !== 'x' && waiting(o))
 console.log(`\nOpen in this milestone: ${inSection.length}${blocked.length ? ` · waiting on the user: ${blocked.map((b) => `${config.plan}:${b.line}`).join(', ')}` : ''}`)
 if (process.argv.includes('--all')) for (const o of inSection) console.log(`  ${config.plan}:${o.line} [${o.status}] ${o.text.slice(0, 110)}`)
+
+// The item's brief was written with the checklist: show it and the prompt to hand over, or say that it is missing.
+const promptsFile = abs('.agent-lead/prompts.json')
+run('node', [path.join(toolsDir, 'prompts.mjs'), '--json', promptsFile])
+const norm = (s) => s.toLowerCase().replace(/[`*]/g, '').replace(/\s+/g, ' ')
+let briefs = []
+try { briefs = JSON.parse(readFileSync(promptsFile, 'utf8')).entries } catch {}
+const mine = briefs.filter((b) => b.state !== 'done' && norm(it.text).includes(norm(b.item)))
+if (mine.length) for (const b of mine) console.log(`\nBrief: .agent-lead/briefs/${b.brief} · ${b.worker} · ${b.state}${b.round > 1 ? ` (round ${b.round})` : ''}${b.state === 'report' ? ' — review it' : `\n${b.prompt}`}`)
+else console.log('\nBrief: MISSING. Every item gets its brief when the checklist is written (SKILL.md section 2b): write it now, with "Item:" and "Worker:" lines.')
 
 const STOP = new Set(
   'about above added adding after again along also another before below between built could does doing done each every first found from have lead user worker into item items like made make more most much only other same second should show shows still such than that their them then there these they third this those through under until using what when where which while will with within without would'.split(' '),

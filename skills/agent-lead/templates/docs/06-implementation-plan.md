@@ -7,6 +7,8 @@
 - The lead keeps this file current; the worker never edits it.
 - Every item cites the requirements it delivers (FR-xx, NFR-xx) and ends with the project's `check` passing.
 - New findings become new items here, not code.
+- Every item has its brief in `.agent-lead/briefs/` from the day this plan is approved; a new item gets one when
+  it is added. The checklist page shows each task's worker prompt.
 - Every item ends with a size tag: `{easy}` (copy, config, one file, no data or auth) or `{hard}`. It picks the
   worker model and the review depth.
 

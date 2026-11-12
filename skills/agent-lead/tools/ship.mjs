@@ -42,7 +42,7 @@ if (!noPlan) {
 }
 
 // The checklist page is a build output: it is committed only when the project already tracks it.
-const generated = [config.page.out, '.agent-lead/handoff.md']
+const generated = [config.page.out, '.agent-lead/handoff.md', '.agent-lead/prompts.json']
 const untracked = generated.filter((f) => git('ls-files', '--error-unmatch', f).status !== 0)
 // The repo map is committed with the code it describes: rebuild it when the project has one.
 const mapFile = config.map ?? '.agent-lead/repo-map.md'

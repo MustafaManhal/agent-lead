@@ -32,7 +32,8 @@ facts. Keep section 8 current.
    briefs, workers). Then this file, the project's AGENTS.md / CLAUDE.md, and only what the handoff does not answer.
 2. `git status --short` and `git log --oneline -8` in the lead checkout; the same in the worker checkout.
 3. `ls -t .agent-lead/briefs | head`: the newest brief, and whether its `.report.md` exists.
-4. Find the first open item in the checklist. Rebuild the checklist page if the plan changed since its last publish.
+4. `node <skill>/tools/prompts.mjs --missing`: write any brief it lists before anything else. Find the first open
+   item in the checklist. Rebuild the checklist page if the plan changed since its last publish.
 5. Tell the user in two or three lines where things stand and what comes next (and the next prompt in Handoff mode).
 
 ## 4. Commands
@@ -43,6 +44,7 @@ facts. Keep section 8 current.
 | Next item, with the files to read | `node <skill>/tools/next.mjs` |
 | Quick check (must pass before every commit) | `node <skill>/tools/check.mjs` |
 | Ship one item (checks, plan, page, commit) | `node <skill>/tools/ship.mjs "<item text>" "<subject>" --coauthor "<worker> <email>"` |
+| Every worker prompt, from the briefs | `node <skill>/tools/prompts.mjs` (`--all`, `--worker <name>`, `--missing`) |
 | Mechanical review (run first, no tokens) | `node <skill>/tools/verify.mjs <brief>` in the worker's checkout (`--tests-only` for a tests-first round) |
 | Merge the worker's branch | `node <skill>/tools/land.mjs <worker branch>` |
 | Repo map (rebuilt by ship) | `node <skill>/tools/map.mjs` → `.agent-lead/repo-map.md` |

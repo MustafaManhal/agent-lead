@@ -4,6 +4,8 @@
 // dependencies.
 //
 //   node plan-page.mjs <plan.md> [out.html] [--title "Project plan"] [--lede "One sentence."] [--sections "<regex>"]
+//                      [--prompts prompts.json]   worker prompts from tools/prompts.mjs: shown at each task with a
+//                                                 Copy button, and in a "Prompts" panel per worker at the top
 //
 // Markers: "- [x]" done, "- [~]" in progress, "- [ ]" not started. Indented lines continue an item. Inline
 // "[x] a. …" markers inside an item are its parts. "## …" headings are milestones (only those that hold items, or
@@ -20,6 +22,7 @@ const flag = (name) => {
 const titleArg = flag('--title')
 const ledeArg = flag('--lede')
 const sectionsArg = flag('--sections')
+const promptsArg = flag('--prompts')
 const [src, out = src?.replace(/\.md$/i, '') + '.html'] = args
 if (!src) {
   console.error('usage: node plan-page.mjs <plan.md> [out.html] [--title "…"] [--lede "…"] [--sections "<regex>"]')
@@ -35,6 +38,17 @@ const inline = (s) =>
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\[(x|~| )\]/g, (_, m) => `<i class="dot ${STATUS[m]}" title="${LABEL[STATUS[m]]}"></i>`)
+
+// Worker prompts (tools/prompts.mjs --json): each one belongs to the plan item its brief names.
+let PROMPTS = []
+try { if (promptsArg) PROMPTS = JSON.parse(readFileSync(promptsArg, 'utf8')).entries ?? [] } catch {}
+const normText = (s) => s.toLowerCase().replace(/[`*]/g, '').replace(/\s+/g, ' ')
+const promptsOf = (i) => PROMPTS.filter((p) => normText(i.text).includes(normText(p.item)))
+const PSTATE = { ready: 'Paste this prompt', round: 'Paste this review round', report: 'Reported · lead reviews', done: 'Done' }
+function promptBlock(p, withBrief = true) {
+  const waiting = p.state === 'report'
+  return `<div class="prompt ${p.state}"><div class="prow"><span class="wk">${esc(p.worker)}</span><span class="pst">${PSTATE[p.state]}${p.round > 1 ? ` · round ${p.round}` : ''}</span>${withBrief ? `<code>${esc(p.brief)}</code>` : ''}${waiting ? '' : '<button type="button" class="copy">Copy prompt</button>'}</div>${waiting ? '' : `<pre>${esc(p.prompt)}</pre>`}</div>`
+}
 
 // ---- Parse ----------------------------------------------------------------------------------------------------
 const lines = readFileSync(src, 'utf8').split('\n')
@@ -172,8 +186,11 @@ function renderItem(i) {
       : ''
   const doneParts = parts.filter((p) => p.status === 'done').length
   const tally = parts.length ? `<span class="ptally">${doneParts}/${parts.length} parts</span>` : ''
+  // The task's prompt sits at the task: while it is open the prompt to paste, once done only who did it.
+  const mine = promptsOf(i)
+  const prompts = i.status === 'done' ? (mine.length ? `<p class="by">${mine.map((p) => `${esc(p.worker)} · <code>${esc(p.brief)}</code>`).join(', ')}</p>` : '') : mine.filter((p) => p.state !== 'done').map((p) => promptBlock(p)).join('')
   const cls = `item ${i.status}${i === nextItem ? ' next' : ''}${i.depth ? ' sub' : ''}`
-  return `<li class="${cls}"><span class="chip ${i.status}">${i === nextItem ? 'Next' : LABEL[i.status]}</span><div class="body"><p class="head">${inline(head)}${tally}</p>${partList}${details}</div></li>`
+  return `<li class="${cls}"><span class="chip ${i.status}">${i === nextItem ? 'Next' : LABEL[i.status]}</span><div class="body"><p class="head">${inline(head)}${tally}</p>${partList}${details}${prompts}</div></li>`
 }
 
 function renderGroup(g) {
@@ -217,6 +234,21 @@ const nextHtml = nextItem
       }</a>`
     })()
   : `<div class="next-card all-done"><span class="eyebrow">Next up</span><span class="what">Every item is done.</span></div>`
+
+// The Prompts panel: one card per worker with what it does now and what waits behind it.
+const openPrompts = PROMPTS.filter((p) => p.state !== 'done' && all.some((i) => i.status !== 'done' && promptsOf(i).includes(p)))
+const promptWorkers = [...new Set(PROMPTS.map((p) => p.worker))].sort()
+const panelHtml = PROMPTS.length
+  ? `<section class="panel" aria-label="Worker prompts"><div class="phead"><span class="eyebrow">Prompts · ${openPrompts.length} open of ${PROMPTS.length} briefs</span></div><div class="pgrid">${promptWorkers
+      .map((w) => {
+        const mine = openPrompts.filter((p) => p.worker === w)
+        const now = mine[0]
+        return `<div class="pcard"><div class="prow"><span class="wk">${esc(w)}</span><span class="pst">${mine.length ? `${mine.length} open` : 'all done'}</span></div>${
+          now ? `<p class="pitem">${inline(headline(now.item).head)}</p>${promptBlock(now)}` : '<p class="pitem muted">Nothing left for this worker.</p>'
+        }${mine.length > 1 ? `<details class="more"><summary>${mine.length - 1} queued</summary>${mine.slice(1).map((p) => `<p class="pitem">${inline(headline(p.item).head)}</p>${promptBlock(p)}`).join('')}</details>` : ''}</div>`
+      })
+      .join('')}</div></section>`
+  : ''
 
 const name = docTitle ?? basename(src)
 const updated = statSync(src).mtime.toISOString().slice(0, 16).replace('T', ' ')
@@ -316,6 +348,21 @@ h3 { font: 500 11.5px/1 var(--font-mono); letter-spacing: .07em; text-transform:
 .parts li.now span { font-weight: 600; }
 .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin: 0 4px 0 2px; vertical-align: baseline; }
 .parts .dot { margin: 6px 0 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px 16px; display: grid; gap: 10px; }
+.pgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; }
+.pcard { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.pitem { margin: 0; font-weight: 500; overflow-wrap: anywhere; } .pitem.muted, .by { color: var(--muted); font-weight: 400; }
+.by { margin: 0; font-size: 12.5px; }
+.prompt { border: 1px solid var(--line); border-radius: 8px; background: var(--sunken); min-width: 0; }
+.prompt.report { border-style: dashed; }
+.prow { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; padding: 6px 8px; font-size: 12.5px; }
+.pcard > .prow { padding: 0; }
+.wk { font: 500 11.5px/1 var(--font-mono); color: var(--accent); background: var(--accent-soft); padding: 4px 6px; border-radius: 5px; }
+.pst { color: var(--muted); }
+.prompt.ready .pst, .prompt.round .pst { color: var(--ink); font-weight: 500; }
+.copy { margin-left: auto; font: 500 12px/1 var(--font-body); color: var(--surface); background: var(--accent); border: 0; border-radius: 6px; padding: 6px 9px; cursor: pointer; }
+.copy:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.prompt pre { margin: 0; padding: 8px 10px; border-top: 1px solid var(--line); font: 12px/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
 .dot.done { background: var(--done); } .dot.partial { background: var(--partial); } .dot.todo { box-shadow: inset 0 0 0 1.5px var(--todo); }
 details.more > summary, details.done-items > summary { cursor: pointer; font: 500 12.5px/1.4 var(--font-body); color: var(--accent); width: max-content; }
 details.more > summary:focus-visible, details.done-items > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
@@ -345,6 +392,7 @@ ${lede ? `<p class="lede">${inline(lede)}</p>` : ''}
 <div class="progress"><span class="eyebrow">Progress</span><span class="pct">${pct(total)}%<small>${total.done} of ${all.length} items</small></span>${bar(total)}<div class="counts"><span class="done"><i></i><b>${total.done}</b> done</span><span class="partial"><i></i><b>${total.partial}</b> in progress</span><span class="todo"><i></i><b>${total.todo}</b> not started</span></div></div>
 ${nextHtml}
 </section>
+${panelHtml}
 <div class="toolbar"><nav aria-label="Milestones">${nav}</nav><div class="actions"><button type="button" id="expand-all">Expand all</button><button type="button" id="collapse-all">Collapse all</button><button type="button" id="only-open" aria-pressed="false">Hide done</button></div></div>
 <div class="milestones">
 ${sectionHtml}
@@ -369,6 +417,22 @@ ${sectionHtml}
     only.setAttribute('aria-pressed', String(on))
     document.body.classList.toggle('only-open', on)
   }
+  // Copy a worker prompt (with a fallback for pages where the clipboard API is not allowed).
+  for (const b of document.querySelectorAll('button.copy')) b.addEventListener('click', async () => {
+    const text = b.closest('.prompt').querySelector('pre').textContent
+    let ok = false
+    try { await navigator.clipboard.writeText(text); ok = true } catch {}
+    if (!ok) {
+      const t = document.createElement('textarea')
+      t.value = text
+      document.body.appendChild(t)
+      t.select()
+      try { ok = document.execCommand('copy') } catch {}
+      t.remove()
+    }
+    b.textContent = ok ? 'Copied' : 'Select the text below'
+    setTimeout(() => { b.textContent = 'Copy prompt' }, 1600)
+  })
   for (const a of document.querySelectorAll('nav a, a.next-card')) a.addEventListener('click', () => {
     const d = document.querySelector(a.getAttribute('href'))
     if (d) d.open = true
@@ -378,5 +442,5 @@ ${sectionHtml}
 `
 mkdirSync(dirname(out), { recursive: true })
 writeFileSync(out, html)
-const summary = { out, sections: milestones.length, done: total.done, partial: total.partial, todo: total.todo, percent: pct(total), next: nextItem ? headline(splitParts(nextItem.text).lead).head : null }
+const summary = { out, sections: milestones.length, done: total.done, partial: total.partial, todo: total.todo, percent: pct(total), prompts: openPrompts.length, next: nextItem ? headline(splitParts(nextItem.text).lead).head : null }
 console.log(JSON.stringify(summary))

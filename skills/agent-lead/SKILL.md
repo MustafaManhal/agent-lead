@@ -29,7 +29,7 @@ Files in this skill (read the one you need, when you need it):
 | `clis.md` | Flags, resume options and rules files of each worker CLI. |
 | `templates/` | `docs/01-PRD.md` … `docs/06-implementation-plan.md`, `LEAD.md`, `WORKER.md`, `brief.md`, `review-round.md`, `status.md`, `decisions.md`, `AGENTS.md` (pointer section), `allow-lists.md`. |
 | `checklist-page.md` | The checklist page every project gets: asking the user once, building it with `plan-page.mjs`, publishing it to one link and republishing after every checklist change. |
-| `tools.md` and `tools/` | Command-line tools for every project: `next`, `check`, `done`, `ship`, `land` for the item loop; `outline`, `show`, `rep`, `snippet` for cheap code reading; `play`, `observe`, `audit-ui` and macOS helpers for seeing the app and the product it matches; `research`, `ask`, `lock`; `verify` (the mechanical review), `map` (repo map), `worker` (parallel workers), `intake` (issues into the plan), `handoff` (session handoff). Set them up during project setup. |
+| `tools.md` and `tools/` | Command-line tools for every project: `next`, `check`, `done`, `ship`, `land` for the item loop; `outline`, `show`, `rep`, `snippet` for cheap code reading; `play`, `observe`, `audit-ui` and macOS helpers for seeing the app and the product it matches; `research`, `ask`, `lock`; `prompts` (every worker prompt, from the briefs), `verify` (the mechanical review), `map` (repo map), `worker` (parallel workers), `intake` (issues into the plan), `handoff` (session handoff). Set them up during project setup. |
 | `plan-page.mjs` | Builds the checklist page from the plan: `node <skill>/plan-page.mjs <plan.md> .agent-lead/checklist.html --title "…"`. |
 | `worker-rules.md` | The rules `agent-run` puts in front of every Pane brief (headless, allow-listed commands). |
 
@@ -56,6 +56,26 @@ The adapter supplies the Codex paths, setup and UI equivalents for the shared wo
   It asks which workflow to use (Handoff or Pane) only when the project has no LEAD.md yet, or when the user's
   words ask to switch. Otherwise it uses LEAD.md's workflow and says so in one line. Record a switch in LEAD.md. Any words after `/lead` are the user's goal for this session.
 
+## 2b. Briefs come with the checklist (before the loop starts)
+
+The checklist is not ready until every item in it has its brief. When the plan is written and the user approves it,
+write **all** the briefs in the same sitting, one per item (one per part for split items), for the whole plan, so
+that no later session has to write one:
+
+- Each brief from `templates/brief.md` into `.agent-lead/briefs/<NN>-<item>.md`, numbered in checklist order. Its
+  `Item:` line repeats the plan item's first words exactly; its `Worker:` line names who does it (`worker-1`, or
+  `worker-1` and `worker-2` in turn when the user wants two workers; items given to different workers in the same
+  phase must not share files under `## Files`).
+- Write what is known now: goal, the doc sections, the files, the checks, done-when. Where a brief depends on an
+  earlier item, say "builds on item NN" instead of a commit hash; fill the hash in when that item lands.
+- `node <skill>/tools/prompts.mjs --missing` must print "every open item has a brief" (it exits 1 otherwise). Only
+  then is setup finished. `done`, `ship` and the page build keep the prompts current from then on.
+- The checklist page shows each task's prompt at the task, with a Copy button, and a **Prompts** panel at the top
+  with what each worker does now and what is queued. When a task is ticked its prompt folds away and the worker's
+  next one moves up. `prompts.mjs` prints the same in the terminal.
+- A new item (a split, a finding, an issue from `intake`) gets its brief in the same turn it enters the checklist.
+  A plan change that makes a brief wrong means fixing that brief then, not at hand-over.
+
 ## 2. The loop for one item (both workflows)
 
 1. **Pick the item** strictly in checklist order (`tools/next.mjs` prints it with the files to read): the first open item, or its first open part. Never skip ahead
@@ -72,15 +92,18 @@ The adapter supplies the Codex paths, setup and UI equivalents for the shared wo
    (`tools/map.mjs`) rather than by searching (declarations and the parts you need, not whole large files), the project docs it touches, and any reference the work must match (a design, an API, a spec,
    another product's behaviour). Leave the full investigation to the worker. Hand long pages or files
    you only need a few facts from to the cheaper model (`tools/ask.mjs`) instead of reading them yourself.
-3. **Write the brief** from `templates/brief.md` into `.agent-lead/briefs/<NN>-<item>.md`. It must stand on its own:
-   the worker has not seen this conversation. Point it at the docs sections it implements (FR numbers, screens,
+3. **Open the item's brief** (`next.mjs` prints its path and the prompt): it was written with the checklist (section
+   2b), so do not write a new one. Refresh only what has changed since: the commits it builds on, files that moved.
+   If `next.mjs` says the brief is missing, write it now from `templates/brief.md`. A brief must stand on its own:
+   the worker has not seen this conversation. It points at the docs sections it implements (FR numbers, screens,
    flows, tables), the research to do first, the in-app check, and the report path. List the files and folders the worker may touch
    under `## Files`: `verify.mjs` holds the worker to them, and parallel workers must not share any. For a `{hard}`
    item with real logic, make it **tests first**: this brief asks only for failing tests written from the spec;
    you check them (`verify.mjs <brief> --tests-only` records them), then a round asks for the code that makes them
    pass. After that, `verify.mjs` fails if the build round edits those tests.
 4. **Hand it over.** Pane: launch it (`workflows/pane.md`). Handoff: give the user the paste-ready prompt in its own
-   code block (`workflows/handoff.md`).
+   code block (`workflows/handoff.md`); the same prompt is on the checklist page at the task, and the user may
+   copy it from there without asking you.
 5. **Review** when the worker finishes (Pane: the run ends; Handoff: the user says "report ready"). Run
    `tools/verify.mjs <brief>` in the worker's checkout first: it costs no tokens and its FAIL lines are the review
    round. In Pane mode `agent-run` has already sent failing checks back to the worker up to two times (`RETRY`

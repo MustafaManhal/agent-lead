@@ -1,9 +1,11 @@
 # Task <NN>: <item name> (<milestone>, <FR-xx, …>)
 
+Item: <the plan item's first words, copied exactly, so the checklist page can show this prompt at that task>
+Worker: <worker-1 | worker-2 | …>
 Size: <easy | hard>. Model: <from LEAD.md section 1>.
 
-Read `<lead checkout>/.agent-lead/WORKER.md` first. <One or two lines: what already landed that this builds on,
-with commit hashes and file names. Which files the lead owns right now, if any.>
+Read `<lead checkout>/.agent-lead/WORKER.md` first. <One or two lines: what this builds on ("item NN" when
+written ahead; the commit hashes and file names once that item has landed). Which files the lead owns right now, if any.>
 
 Find files through `.agent-lead/repo-map.md` before searching. Your dev server port is `$AGENT_LEAD_PORT` when set.
 

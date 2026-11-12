@@ -51,7 +51,8 @@ Every later session: run `/lead` again; the lead reads
 
 1. The lead picks the next open item in the implementation plan, in order, and finishes it before another: it stays in the
    current phase (milestone) until every task of that phase is complete, then starts the next phase the same way.
-2. It writes a self-contained brief: goal, research to do first, what to build, how to check it, the report path.
+2. It opens the item's brief (written with the checklist: goal, research to do first, what to build, how to check
+   it, the report path) and refreshes what changed.
 3. Handoff: you paste the prompt it gives you into the worker. Pane: it launches the worker and `/agent` opens.
 4. The worker researches, builds, tests, checks in the app, and writes `<brief>.report.md`.
 5. The lead reviews: the report against the brief, the diff against the report, the checks, the risky code, the
@@ -214,6 +215,7 @@ lives in its own repo: [scan-tool](https://github.com/MustafaManhal/scan-tool). 
 
 | | What happens |
 | --- | --- |
+| Briefs up front | Every brief is written with the checklist, so later sessions never stop to write one. The checklist page shows each task's worker prompt with a Copy button and a Prompts panel per worker; it updates when a task is ticked. |
 | Auto-retry | After a Pane run, failing checks go back to the same worker session, up to two times, before the lead reads anything. |
 | `verify` | A script, not a model, checks the report, the brief's file scope, dependencies, secrets and the checks. The lead reads a diff only after it passes. |
 | Repo map | `.agent-lead/repo-map.md`: every source file with its exports, so agents open the right file first. |

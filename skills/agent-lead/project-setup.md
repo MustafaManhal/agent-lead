@@ -78,6 +78,7 @@ when it ran; ask it only when the skill was started without `/lead`.
   briefs/        briefs, review rounds and worker reports                           git-ignored
   checklist.html the checklist page, built by plan-page.mjs (checklist-page.md)  git-ignored
   handoff.md     the generated session handoff (handoff.mjs, after every ship)   git-ignored
+  prompts.json   the worker prompts the page shows (prompts.mjs)                 git-ignored
   repo-map.md    the generated repo map (map.mjs, rebuilt by ship)               commit
 ```
 
@@ -85,7 +86,7 @@ when it ran; ask it only when the skill was started without `/lead`.
   folder, checklist), the commands from step 1, the commit style, the review checks that matter for this project
   (UI screenshots, API contract tests, migrations, accessibility…), the checklist page (URL, local, or declined with
   the date), and the current state. A new session must be able to continue from it alone.
-- Git-ignore `briefs/` and `checklist.html` locally: add `.agent-lead/briefs/`, `.agent-lead/checklist.html` and `.agent-lead/handoff.md` to
+- Git-ignore `briefs/` and `checklist.html` locally: add `.agent-lead/briefs/`, `.agent-lead/checklist.html`, `.agent-lead/handoff.md` and `.agent-lead/prompts.json` to
   `.git/info/exclude` (shared by every worktree), not to `.gitignore`, unless the user wants it in the repo.
 - Point the agents at the files:
   - Lead sessions: add to the project's `CLAUDE.md` (create it if missing) a short section: "Lead sessions: run
@@ -118,9 +119,15 @@ sign in once.
   own branch, clean. If its branch is behind the lead branch, ask before fast-forwarding it.
 - Record the path and branch in LEAD.md.
 
+## 5b. Every brief, now
+
+Write the brief for every item of the approved checklist, on either track (SKILL.md section 2b), and assign each to
+a worker. `node <skill>/tools/prompts.mjs --missing` must report none. An existing project that was set up before
+this rule gets its missing briefs at the start of the next session.
+
 ## 6. Finish
 
 Build and publish the checklist page as the user chose (`checklist-page.md`). Then tell the user, briefly: the
 workflow, the worker, where the six docs and the checklist are, the checklist page link (private until they share
-it), what you created, the first item. Then start the loop (SKILL.md section 2) with that item, usually M0:
+it), what you created, the first item, and that every task's prompt is on the checklist page ready to copy. Then start the loop (SKILL.md section 2) with that item, usually M0:
 write its brief and either launch it (Pane) or give the paste-ready prompt (Handoff).
